@@ -38,7 +38,8 @@ class DatabaseManager:
             port=self.db_config['port'],
             dbname=self.db_config['name'],
             user=self.db_config['user'],
-            password=self.db_config['password']
+            password=self.db_config['password'],
+            client_encoding='utf8'
         )
     
     def execute_query(self, query, params=None, fetch=True):
@@ -70,6 +71,12 @@ class DatabaseManager:
         for key, value in row.items():
             if hasattr(value, 'isoformat'):
                 serialized[key] = value.isoformat()
+            elif isinstance(value, str):
+                # Ensure string is valid UTF-8
+                try:
+                    serialized[key] = value.encode('utf-8').decode('utf-8')
+                except (UnicodeEncodeError, UnicodeDecodeError):
+                    serialized[key] = value.encode('cp1251', errors='replace').decode('utf-8', errors='replace')
             else:
                 serialized[key] = value
         return serialized
