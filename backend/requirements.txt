@@ -1,2 +1,2 @@
 psycopg2-binary>=2.9.0
-hashlib
+PyQt6>=6.6.0

@@ -117,9 +117,9 @@ def generate_employees(count=50):
     return employees
 
 
-def generate_cadets(count=200):
-    """Generate cadet records"""
-    cadets = []
+def generate_students(count=200):
+    """Generate student records"""
+    students = []
     
     for i in range(1, count + 1):
         last_name = random.choice(LAST_NAMES)
@@ -136,9 +136,9 @@ def generate_cadets(count=200):
         age = random.randint(16, 35)
         group_id = random.randint(1, 10)  # group_ids 1-10
         
-        cadets.append((i, passport, full_name, med_cert, age, group_id))
+        students.append((i, passport, full_name, med_cert, age, group_id))
     
-    return cadets
+    return students
 
 
 def generate_lessons(count=300, employee_ids=None):
@@ -164,15 +164,15 @@ def generate_lessons(count=300, employee_ids=None):
     return lessons
 
 
-def generate_cadet_lessons(cadet_ids, lesson_ids, avg_lessons_per_cadet=5):
-    """Generate cadet-lesson associations"""
+def generate_student_lessons(student_ids, lesson_ids, avg_lessons_per_student=5):
+    """Generate student-lesson associations"""
     associations = set()
     
-    for cadet_id in cadet_ids:
-        num_lessons = random.randint(2, avg_lessons_per_cadet + 2)
+    for student_id in student_ids:
+        num_lessons = random.randint(2, avg_lessons_per_student + 2)
         selected_lessons = random.sample(lesson_ids, min(num_lessons, len(lesson_ids)))
         for lesson_id in selected_lessons:
-            associations.add((cadet_id, lesson_id))
+            associations.add((student_id, lesson_id))
     
     return list(associations)
 
@@ -196,14 +196,14 @@ def generate_sql_inserts(output_file='database/populate_main_tables.sql'):
     random.seed(42)  # Reproducible results
     
     employees = generate_employees(50)
-    cadets = generate_cadets(200)
+    students = generate_students(200)
     lessons = generate_lessons(300, employee_ids=list(range(1, 51)))
     
-    cadet_ids = list(range(1, 201))
+    student_ids = list(range(1, 201))
     lesson_ids = list(range(1, 301))
     group_ids = list(range(1, 11))
     
-    cadet_lessons = generate_cadet_lessons(cadet_ids, lesson_ids)
+    student_lessons = generate_student_lessons(student_ids, lesson_ids)
     group_lessons = generate_group_lessons(group_ids, lesson_ids)
     
     sql_lines = []
@@ -225,17 +225,17 @@ def generate_sql_inserts(output_file='database/populate_main_tables.sql'):
     sql_lines.append(',\n'.join(emp_values) + ';')
     sql_lines.append(f"\nSELECT setval('public.employees_id_seq', (SELECT MAX(id) FROM public.employees));\n")
     
-    # Cadets
+    # Students
     sql_lines.append("-- ============================================================================")
-    sql_lines.append("-- Cadets (Курсанты)")
+    sql_lines.append("-- Students (Ученики/Курсанты)")
     sql_lines.append("-- ============================================================================\n")
-    sql_lines.append("INSERT INTO public.cadets (id, passport_number, full_name, medical_certificate, age, group_id) VALUES")
+    sql_lines.append("INSERT INTO public.students (id, passport_number, full_name, medical_certificate, age, group_id) VALUES")
     
-    cadet_values = []
-    for cadet in cadets:
-        cadet_values.append(f"({cadet[0]}, '{cadet[1]}', '{cadet[2]}', '{cadet[3]}', {cadet[4]}, {cadet[5]})")
-    sql_lines.append(',\n'.join(cadet_values) + ';')
-    sql_lines.append(f"\nSELECT setval('public.cadets_id_seq', (SELECT MAX(id) FROM public.cadets));\n")
+    student_values = []
+    for student in students:
+        student_values.append(f"({student[0]}, '{student[1]}', '{student[2]}', '{student[3]}', {student[4]}, {student[5]})")
+    sql_lines.append(',\n'.join(student_values) + ';')
+    sql_lines.append(f"\nSELECT setval('public.students_id_seq', (SELECT MAX(id) FROM public.students));\n")
     
     # Lessons
     sql_lines.append("-- ============================================================================")
@@ -256,16 +256,16 @@ def generate_sql_inserts(output_file='database/populate_main_tables.sql'):
     sql_lines.append(',\n'.join(lesson_values) + ';')
     sql_lines.append(f"\nSELECT setval('public.lessons_id_seq', (SELECT MAX(id) FROM public.lessons));\n")
     
-    # Cadet-Lessons
+    # Student-Lessons
     sql_lines.append("-- ============================================================================")
-    sql_lines.append("-- Cadet-Lesson Associations (Курсант-Занятия)")
+    sql_lines.append("-- Student-Lesson Associations (Ученик-Занятия)")
     sql_lines.append("-- ============================================================================\n")
-    sql_lines.append("INSERT INTO public.cadet_lessons (cadet_id, lesson_id) VALUES")
+    sql_lines.append("INSERT INTO public.student_lessons (student_id, lesson_id) VALUES")
     
-    cl_values = []
-    for cl in cadet_lessons:
-        cl_values.append(f"({cl[0]}, {cl[1]})")
-    sql_lines.append(',\n'.join(cl_values) + ';\n')
+    sl_values = []
+    for sl in student_lessons:
+        sl_values.append(f"({sl[0]}, {sl[1]})")
+    sql_lines.append(',\n'.join(sl_values) + ';\n')
     
     # Group-Lessons
     sql_lines.append("-- ============================================================================")
@@ -283,9 +283,9 @@ def generate_sql_inserts(output_file='database/populate_main_tables.sql'):
     sql_lines.append("-- Summary")
     sql_lines.append("-- ============================================================================")
     sql_lines.append(f"-- Employees: {len(employees)}")
-    sql_lines.append(f"-- Cadets: {len(cadets)}")
+    sql_lines.append(f"-- Students: {len(students)}")
     sql_lines.append(f"-- Lessons: {len(lessons)}")
-    sql_lines.append(f"-- Cadet-Lesson associations: {len(cadet_lessons)}")
+    sql_lines.append(f"-- Student-Lesson associations: {len(student_lessons)}")
     sql_lines.append(f"-- Group-Lesson associations: {len(group_lessons)}")
     sql_lines.append("-- ============================================================================\n")
     
@@ -294,9 +294,9 @@ def generate_sql_inserts(output_file='database/populate_main_tables.sql'):
     
     print(f"SQL file generated: {output_file}")
     print(f"  Employees: {len(employees)}")
-    print(f"  Cadets: {len(cadets)}")
+    print(f"  Students: {len(students)}")
     print(f"  Lessons: {len(lessons)}")
-    print(f"  Cadet-Lesson associations: {len(cadet_lessons)}")
+    print(f"  Student-Lesson associations: {len(student_lessons)}")
     print(f"  Group-Lesson associations: {len(group_lessons)}")
 
 

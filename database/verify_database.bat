@@ -14,7 +14,7 @@ set PG_HOST=localhost
 set PG_PORT=5432
 set PG_USER=postgres
 set PG_PASSWORD=postgres
-set DB_NAME=educational_process
+set DB_NAME=driving_school
 
 set PGPASSWORD=%PG_PASSWORD%
 
@@ -33,7 +33,7 @@ echo Checking tables...
 
 echo.
 echo Checking record counts...
-"%PG_BIN%\psql.exe" -U %PG_USER% -h %PG_HOST% -p %PG_PORT% -d %DB_NAME% -c "SELECT 'positions' as table_name, COUNT(*) as count FROM positions UNION ALL SELECT 'lesson_formats', COUNT(*) FROM lesson_formats UNION ALL SELECT 'locations', COUNT(*) FROM locations UNION ALL SELECT 'vehicles', COUNT(*) FROM vehicles UNION ALL SELECT 'groups', COUNT(*) FROM groups UNION ALL SELECT 'employees', COUNT(*) FROM employees UNION ALL SELECT 'cadets', COUNT(*) FROM cadets UNION ALL SELECT 'lessons', COUNT(*) FROM lessons UNION ALL SELECT 'cadet_lessons', COUNT(*) FROM cadet_lessons UNION ALL SELECT 'group_lessons', COUNT(*) FROM group_lessons ORDER BY table_name;"
+"%PG_BIN%\psql.exe" -U %PG_USER% -h %PG_HOST% -p %PG_PORT% -d %DB_NAME% -c "SELECT 'positions' as table_name, COUNT(*) as count FROM positions UNION ALL SELECT 'lesson_formats', COUNT(*) FROM lesson_formats UNION ALL SELECT 'locations', COUNT(*) FROM locations UNION ALL SELECT 'vehicles', COUNT(*) FROM vehicles UNION ALL SELECT 'groups', COUNT(*) FROM groups UNION ALL SELECT 'employees', COUNT(*) FROM employees UNION ALL SELECT 'students', COUNT(*) FROM students UNION ALL SELECT 'lessons', COUNT(*) FROM lessons UNION ALL SELECT 'student_lessons', COUNT(*) FROM student_lessons UNION ALL SELECT 'group_lessons', COUNT(*) FROM group_lessons ORDER BY table_name;"
 
 echo.
 echo Checking views...

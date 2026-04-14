@@ -42,11 +42,11 @@ TABLES = {
         'lookup': False,
         'url': '/api/employees'
     },
-    'cadets': {
-        'table': 'cadets',
+    'students': {
+        'table': 'students',
         'primary_key': 'id',
         'lookup': False,
-        'url': '/api/cadets'
+        'url': '/api/students'
     },
     'groups': {
         'table': 'groups',
@@ -84,11 +84,11 @@ TABLES = {
         'lookup': True,
         'url': '/api/lesson-formats'
     },
-    'cadet-lessons': {
-        'table': 'cadet_lessons',
-        'primary_key': ('cadet_id', 'lesson_id'),
+    'student-lessons': {
+        'table': 'student_lessons',
+        'primary_key': ('student_id', 'lesson_id'),
         'lookup': False,
-        'url': '/api/cadet-lessons'
+        'url': '/api/student-lessons'
     },
     'group-lessons': {
         'table': 'group_lessons',

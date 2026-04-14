@@ -14,7 +14,7 @@ set PG_HOST=localhost
 set PG_PORT=5432
 set PG_USER=postgres
 set PG_PASSWORD=postgres
-set DB_NAME=educational_process
+set DB_NAME=driving_school
 
 set PGPASSWORD=%PG_PASSWORD%
 

@@ -20,4 +20,4 @@ END
 $$;
 
 -- Create database
-SELECT 'CREATE DATABASE educational_process' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'educational_process')\gexec
+SELECT 'CREATE DATABASE driving_school' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'driving_school')\gexec
