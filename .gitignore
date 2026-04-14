@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+*.egg-info/
+.pytest_cache/
+.coverage
+
+# Logs
+logs/
+*.log
+
+# Backups (keep .gitignore, ignore actual backups)
+backups/*.sql
+backups/*.dump
+backups/*.backup
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# PostgreSQL
+*.sql~
+
+# Config (uncomment if you want to ignore config with passwords)
+# backend/config.json
+
+# Database generated files
+database/populate_main_tables.sql
