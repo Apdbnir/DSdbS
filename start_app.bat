@@ -11,16 +11,16 @@ echo.
 
 cd /d "%~dp0backend"
 
-REM Check if virtual environment exists
+REM Create virtual environment if not exists
 if not exist "venv\" (
     echo Creating virtual environment...
     python -m venv venv
-    call venv\Scripts\activate
-    echo Installing dependencies...
-    pip install -r requirements.txt
-) else (
-    call venv\Scripts\activate
 )
+
+call venv\Scripts\activate
+
+echo Installing dependencies...
+pip install --upgrade -r requirements.txt
 
 echo.
 echo Starting desktop application...

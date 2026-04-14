@@ -343,25 +343,37 @@ class RecordDialog(QDialog):
         self.edit_mode = edit_mode
         self.record = record
         self.db = DatabaseManager()
-        
-        self.setWindowTitle(f"{'Редактировать' if edit_mode else 'Добавить'} - {TABLES[table_name]['title']}")
-        self.setMinimumWidth(500)
-        
+
+        self.setWindowTitle(f"{'Редактировать' if edit_mode else 'Добавить'} — {TABLES[table_name]['title']}")
+        self.setMinimumWidth(550)
+        self.setMinimumHeight(400)
+
         self.setup_ui()
     
     def setup_ui(self):
         layout = QVBoxLayout(self)
+        layout.setSpacing(14)
+
         form_layout = QFormLayout()
-        
+        form_layout.setSpacing(12)
+        form_layout.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+
         config = TABLES[self.table_name]
         self.fields = {}
-        
+
         for col in config['columns']:
             if col['readonly'] and self.edit_mode:
                 # Show readonly fields as labels
                 value = str(self.record.get(col['key'], '')) if self.record else ''
                 label = QLabel(value)
-                label.setStyleSheet("QLabel { padding: 5px; background: #f0f0f0; border: 1px solid #ccc; border-radius: 3px; }")
+                label.setFont(QFont("Segoe UI", 11))
+                label.setStyleSheet("""
+                    padding: 8px 12px;
+                    background: #334155;
+                    border: 1px solid #475569;
+                    border-radius: 6px;
+                    color: #94a3b8;
+                """)
                 form_layout.addRow(col['label'] + ":", label)
             elif col['readonly'] and not self.edit_mode:
                 continue
@@ -369,23 +381,49 @@ class RecordDialog(QDialog):
                 widget = self.create_widget(col)
                 if self.edit_mode and self.record:
                     self.set_widget_value(widget, col, self.record.get(col['key']))
-                
+
                 form_layout.addRow(col['label'] + ":", widget)
                 self.fields[col['key']] = (widget, col)
-        
+
         layout.addLayout(form_layout)
-        
+
         # Buttons
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
-        )
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
+        button_layout = QHBoxLayout()
+        button_layout.setSpacing(10)
+
+        cancel_btn = QPushButton("Отмена")
+        cancel_btn.setMinimumHeight(42)
+        cancel_btn.setFont(QFont("Segoe UI", 12))
+        cancel_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        cancel_btn.setStyleSheet("""
+            QPushButton {
+                background: #475569;
+                color: #f1f5f9;
+                border-radius: 8px;
+                padding: 10px 20px;
+            }
+            QPushButton:hover {
+                background: #64748b;
+            }
+        """)
+        cancel_btn.clicked.connect(self.reject)
+        button_layout.addWidget(cancel_btn)
+
+        save_btn = QPushButton("Сохранить")
+        save_btn.setMinimumHeight(42)
+        save_btn.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
+        save_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        save_btn.clicked.connect(self.accept)
+        button_layout.addWidget(save_btn)
+
+        layout.addLayout(button_layout)
     
     def create_widget(self, col):
         if col['type'] == 'reference':
             combo = QComboBox()
+            combo.setMinimumHeight(38)
+            combo.setFont(QFont("Segoe UI", 11))
+            combo.setCursor(Qt.CursorShape.PointingHandCursor)
             combo.addItem('-- Выберите --', userData=None)
             ref_data = self.db.get_reference_data(col['ref_table'], col['ref_label'])
             for ref_id, ref_label in ref_data:
@@ -394,22 +432,33 @@ class RecordDialog(QDialog):
         elif col['type'] == 'number':
             spin = QSpinBox()
             spin.setRange(-99999, 999999)
+            spin.setMinimumHeight(38)
+            spin.setFont(QFont("Segoe UI", 11))
             return spin
         elif col['type'] == 'date':
             date_edit = QDateEdit()
             date_edit.setCalendarPopup(True)
             date_edit.setDate(QDate.currentDate())
+            date_edit.setMinimumHeight(38)
+            date_edit.setFont(QFont("Segoe UI", 11))
+            date_edit.setCursor(Qt.CursorShape.PointingHandCursor)
             return date_edit
         elif col['type'] == 'time':
             time_edit = QDateEdit()
             time_edit.setTime(QTime.currentTime())
+            time_edit.setMinimumHeight(38)
+            time_edit.setFont(QFont("Segoe UI", 11))
+            time_edit.setCursor(Qt.CursorShape.PointingHandCursor)
             return time_edit
         elif col['type'] == 'textarea':
             text_edit = QTextEdit()
             text_edit.setMaximumHeight(80)
+            text_edit.setFont(QFont("Segoe UI", 11))
             return text_edit
         else:
             line_edit = QLineEdit()
+            line_edit.setMinimumHeight(38)
+            line_edit.setFont(QFont("Segoe UI", 11))
             return line_edit
     
     def set_widget_value(self, widget, col, value):
@@ -480,48 +529,68 @@ class DataTableWidget(QWidget):
     
     def setup_ui(self):
         layout = QVBoxLayout(self)
-        
+        layout.setSpacing(12)
+
         # Toolbar
         toolbar = QHBoxLayout()
-        
+        toolbar.setSpacing(10)
+
         self.search_edit = QLineEdit()
-        self.search_edit.setPlaceholderText("Поиск...")
+        self.search_edit.setPlaceholderText("🔍  Поиск...")
+        self.search_edit.setMinimumHeight(40)
+        self.search_edit.setFont(QFont("Segoe UI", 11))
         self.search_edit.textChanged.connect(self.filter_data)
         toolbar.addWidget(self.search_edit)
-        
-        btn_add = QPushButton("➕ Добавить")
+
+        btn_add = QPushButton("➕  Добавить")
+        btn_add.setMinimumHeight(40)
+        btn_add.setFont(QFont("Segoe UI", 11))
+        btn_add.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_add.clicked.connect(self.add_record)
         toolbar.addWidget(btn_add)
-        
-        btn_refresh = QPushButton("🔄 Обновить")
+
+        btn_refresh = QPushButton("🔄  Обновить")
+        btn_refresh.setMinimumHeight(40)
+        btn_refresh.setFont(QFont("Segoe UI", 11))
+        btn_refresh.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_refresh.clicked.connect(self.load_data)
         toolbar.addWidget(btn_refresh)
-        
+
         layout.addLayout(toolbar)
-        
+
         # Table
         self.table = QTableWidget()
         self.table.setAlternatingRowColors(True)
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self.table.horizontalHeader().setStretchLastSection(True)
-        
+        self.table.verticalHeader().setVisible(False)
+        self.table.setMinimumHeight(400)
+        self.table.setFont(QFont("Segoe UI", 11))
+
         # Double-click to edit
         self.table.cellDoubleClicked.connect(lambda row, col: self.edit_record())
-        
+
         layout.addWidget(self.table)
-        
+
         # Action buttons
         button_layout = QHBoxLayout()
-        
-        btn_edit = QPushButton("✏️ Редактировать")
+        button_layout.setSpacing(10)
+
+        btn_edit = QPushButton("✏️  Редактировать")
+        btn_edit.setMinimumHeight(40)
+        btn_edit.setFont(QFont("Segoe UI", 11))
+        btn_edit.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_edit.clicked.connect(self.edit_record)
         button_layout.addWidget(btn_edit)
-        
-        btn_delete = QPushButton("🗑️ Удалить")
+
+        btn_delete = QPushButton("🗑️  Удалить")
+        btn_delete.setMinimumHeight(40)
+        btn_delete.setFont(QFont("Segoe UI", 11))
+        btn_delete.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_delete.clicked.connect(self.delete_record)
         button_layout.addWidget(btn_delete)
-        
+
         layout.addLayout(button_layout)
     
     def load_data(self, filters=None):
@@ -680,32 +749,55 @@ class DashboardWidget(QWidget):
     
     def setup_ui(self):
         layout = QVBoxLayout(self)
-        
+        layout.setSpacing(20)
+
         # Title
         title = QLabel("📊 Панель управления")
-        title.setFont(QFont("Arial", 18, QFont.Weight.Bold))
+        title.setFont(QFont("Segoe UI", 24, QFont.Weight.Bold))
+        title.setStyleSheet("""
+            color: #f1f5f9;
+            padding: 10px 0;
+        """)
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
-        
+
         # Stats grid
         self.stats_layout = QGridLayout()
+        self.stats_layout.setSpacing(12)
         layout.addLayout(self.stats_layout)
-        
+
         # Welcome message
-        welcome = QGroupBox("Добро пожаловать в систему управления учебным процессом!")
+        welcome = QGroupBox("  Добро пожаловать в систему управления автошколой!")
+        welcome.setFont(QFont("Segoe UI", 13, QFont.Weight.Bold))
+        welcome.setStyleSheet("""
+            QGroupBox {
+                background: #1e293b;
+                border: 1px solid #334155;
+                border-radius: 12px;
+                padding: 20px;
+                margin-top: 16px;
+                color: #f1f5f9;
+            }
+        """)
         welcome_layout = QVBoxLayout(welcome)
-        
+
         info_label = QLabel(
             "Выберите раздел в боковом меню для начала работы.\n\n"
-            "✅ Управление сотрудниками и курсантами\n"
-            "✅ Расписание занятий\n"
-            "✅ Группы и места проведения\n"
-            "✅ Создание резервных копий\n"
-            "✅ Фильтрация и поиск данных"
+            "✅  Управление сотрудниками и учениками\n"
+            "✅  Расписание занятий по вождению\n"
+            "✅  Группы и места проведения\n"
+            "✅  Создание резервных копий\n"
+            "✅  Фильтрация и поиск данных"
         )
         info_label.setWordWrap(True)
+        info_label.setFont(QFont("Segoe UI", 12))
+        info_label.setStyleSheet("""
+            color: #cbd5e1;
+            padding: 8px;
+            line-height: 1.6;
+        """)
         welcome_layout.addWidget(info_label)
-        
+
         layout.addWidget(welcome)
     
     def load_stats(self):
@@ -744,35 +836,38 @@ class DashboardWidget(QWidget):
         card = QGroupBox()
         card.setStyleSheet("""
             QGroupBox {
-                background: white;
-                border: 2px solid #e2e8f0;
-                border-radius: 10px;
-                padding: 15px;
+                background: #1e293b;
+                border: 1px solid #334155;
+                border-radius: 12px;
+                padding: 20px;
+                margin: 4px;
             }
             QGroupBox:hover {
-                border-color: #2563eb;
+                border-color: #3b82f6;
+                background: #1e293b;
             }
         """)
-        
+
         layout = QVBoxLayout(card)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        
+        layout.setSpacing(6)
+
         icon_label = QLabel(icon)
-        icon_label.setFont(QFont("Arial", 32))
+        icon_label.setFont(QFont("Segoe UI Emoji", 36))
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(icon_label)
-        
+
         count_label = QLabel(str(count))
-        count_label.setFont(QFont("Arial", 24, QFont.Weight.Bold))
-        count_label.setStyleSheet("color: #2563eb;")
+        count_label.setFont(QFont("Segoe UI", 28, QFont.Weight.Bold))
+        count_label.setStyleSheet("color: #3b82f6;")
         count_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(count_label)
-        
+
         name_label = QLabel(label)
-        name_label.setStyleSheet("color: #64748b; font-size: 12px;")
+        name_label.setStyleSheet("color: #94a3b8; font-size: 13px;")
         name_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(name_label)
-        
+
         return card
 
 
@@ -787,27 +882,45 @@ class BackupWidget(QWidget):
     
     def setup_ui(self):
         layout = QVBoxLayout(self)
-        
+        layout.setSpacing(16)
+
         title = QLabel("💾 Резервное копирование")
-        title.setFont(QFont("Arial", 16, QFont.Weight.Bold))
+        title.setFont(QFont("Segoe UI", 20, QFont.Weight.Bold))
+        title.setStyleSheet("""
+            color: #f1f5f9;
+            padding: 8px 0;
+        """)
         layout.addWidget(title)
-        
+
         info = QLabel("Создайте резервную копию базы данных для сохранения текущего состояния.")
         info.setWordWrap(True)
+        info.setFont(QFont("Segoe UI", 12))
+        info.setStyleSheet("""
+            color: #94a3b8;
+            padding: 8px;
+        """)
         layout.addWidget(info)
-        
+
         btn_backup = QPushButton("Создать резервную копию")
         btn_backup.setMinimumHeight(50)
-        btn_backup.setFont(QFont("Arial", 12))
+        btn_backup.setFont(QFont("Segoe UI", 13, QFont.Weight.Bold))
+        btn_backup.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_backup.clicked.connect(self.create_backup)
         layout.addWidget(btn_backup)
-        
+
         self.status_label = QLabel()
         self.status_label.setWordWrap(True)
-        self.status_label.setStyleSheet("padding: 10px; background: #f0f0f0; border-radius: 5px;")
+        self.status_label.setFont(QFont("Segoe UI", 11))
+        self.status_label.setStyleSheet("""
+            padding: 16px;
+            background: #1e293b;
+            border-radius: 8px;
+            border: 1px solid #334155;
+            color: #f1f5f9;
+        """)
         self.status_label.hide()
         layout.addWidget(self.status_label)
-        
+
         layout.addStretch()
     
     def create_backup(self):
@@ -824,11 +937,23 @@ class BackupWidget(QWidget):
         result = self.db.create_backup()
         
         if result['status'] == 'success':
-            self.status_label.setStyleSheet("padding: 10px; background: #d1fae5; border-radius: 5px; color: #065f46;")
+            self.status_label.setStyleSheet("""
+                padding: 16px;
+                background: #052e16;
+                border-radius: 8px;
+                border: 1px solid #166534;
+                color: #4ade80;
+            """)
             self.status_label.setText(f"✅ Бэкап успешно создан:\n{result['file']}")
             QMessageBox.information(self, "Успех", "Резервная копия успешно создана")
         else:
-            self.status_label.setStyleSheet("padding: 10px; background: #fee2e2; border-radius: 5px; color: #991b1b;")
+            self.status_label.setStyleSheet("""
+                padding: 16px;
+                background: #2e0505;
+                border-radius: 8px;
+                border: 1px solid #651616;
+                color: #f87171;
+            """)
             self.status_label.setText(f"❌ Ошибка: {result.get('message', 'Неизвестная ошибка')}")
             QMessageBox.critical(self, "Ошибка", f"Не удалось создать бэкап:\n{result.get('message')}")
 
@@ -846,8 +971,9 @@ class MainWindow(QMainWindow):
         self.show_dashboard()
     
     def setup_ui(self):
-        self.setWindowTitle("Система управления учебным процессом")
-        self.setGeometry(100, 100, 1200, 800)
+        self.setWindowTitle("Автошкола — Система управления")
+        self.setGeometry(80, 80, 1400, 900)
+        self.setFont(QFont("Segoe UI", 11))
         
         # Central widget with horizontal layout
         central = QWidget()
@@ -858,28 +984,39 @@ class MainWindow(QMainWindow):
         
         # Sidebar
         sidebar = self.create_sidebar()
-        sidebar.setMaximumWidth(250)
-        sidebar.setStyleSheet("background: #1e293b; color: white;")
+        sidebar.setMaximumWidth(260)
+        sidebar.setStyleSheet("""
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #0f172a, stop:1 #1e293b);
+        """)
         main_layout.addWidget(sidebar)
-        
+
         # Content area
         content_frame = QFrame()
-        content_frame.setStyleSheet("background: #f8fafc;")
+        content_frame.setStyleSheet("""
+            background: #0f172a;
+        """)
         content_layout = QVBoxLayout(content_frame)
-        content_layout.setContentsMargins(20, 20, 20, 20)
-        
+        content_layout.setContentsMargins(24, 24, 24, 24)
+        content_layout.setSpacing(16)
+
         # Header
         header = QHBoxLayout()
         self.page_title = QLabel("Панель управления")
-        self.page_title.setFont(QFont("Arial", 16, QFont.Weight.Bold))
+        self.page_title.setFont(QFont("Segoe UI", 20, QFont.Weight.Bold))
+        self.page_title.setStyleSheet("""
+            color: #f1f5f9;
+            padding: 4px 0;
+        """)
         header.addWidget(self.page_title)
-        
+
         header.addStretch()
-        
+
         self.auth_btn = QPushButton("🔐 Войти как суперпользователь")
+        self.auth_btn.setMinimumHeight(36)
+        self.auth_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.auth_btn.clicked.connect(self.authenticate)
         header.addWidget(self.auth_btn)
-        
+
         content_layout.addLayout(header)
         
         # Stacked widget for pages
@@ -890,6 +1027,12 @@ class MainWindow(QMainWindow):
         
         # Status bar
         self.statusBar().showMessage("Готово")
+        self.statusBar().setStyleSheet("""
+            QStatusBar {
+                font-size: 13px;
+                padding: 4px;
+            }
+        """)
     
     def create_sidebar(self):
         sidebar = QWidget()
@@ -897,68 +1040,87 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(10, 10, 10, 10)
         
         # Logo
-        logo = QLabel("📚 Учебный процесс")
-        logo.setFont(QFont("Arial", 14, QFont.Weight.Bold))
-        logo.setStyleSheet("color: white; padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.1);")
+        logo = QLabel("📚 Автошкола")
+        logo.setFont(QFont("Segoe UI", 15, QFont.Weight.Bold))
+        logo.setStyleSheet("""
+            color: #f1f5f9;
+            padding: 15px 10px;
+            margin-bottom: 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+        """)
         layout.addWidget(logo)
-        
+
         # Navigation buttons
         self.nav_buttons = {}
-        
+
         nav_items = [
-            ('dashboard', '🏠 Панель управления'),
-            ('employees', '👨‍🏫 Сотрудники'),
-            ('students', '👨‍🎓 Ученики'),
-            ('lessons', '🚗 Занятия'),
-            ('groups', '👥 Группы'),
-            ('positions', '💼 Должности'),
-            ('locations', '📍 Места проведения'),
-            ('vehicles', '🚗 Автомобили'),
-            ('lesson-formats', '📋 Формы обучения'),
+            ('dashboard', '🏠  Панель управления'),
+            ('employees', '👨‍🏫  Сотрудники'),
+            ('students', '👨‍🎓  Ученики'),
+            ('lessons', '📖  Занятия'),
+            ('groups', '👥  Группы'),
+            ('positions', '💼  Должности'),
+            ('locations', '📍  Места проведения'),
+            ('vehicles', '🚗  Автомобили'),
+            ('lesson-formats', '📋  Формы обучения'),
         ]
-        
+
         for key, label in nav_items:
             btn = QPushButton(label)
+            btn.setMinimumHeight(42)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setFont(QFont("Segoe UI", 13))
             btn.setStyleSheet("""
                 QPushButton {
                     text-align: left;
-                    padding: 12px 15px;
+                    padding: 10px 16px;
                     border: none;
-                    border-radius: 5px;
-                    color: white;
+                    border-radius: 8px;
+                    color: #cbd5e1;
                     font-size: 13px;
+                    margin-bottom: 4px;
                 }
                 QPushButton:hover {
-                    background: rgba(255,255,255,0.1);
+                    background: rgba(255,255,255,0.08);
+                    color: #f1f5f9;
                 }
                 QPushButton:checked {
-                    background: #2563eb;
+                    background: #3b82f6;
+                    color: white;
+                    font-weight: bold;
                 }
             """)
             btn.setCheckable(True)
             btn.clicked.connect(lambda checked, k=key: self.navigate_to(k))
             layout.addWidget(btn)
             self.nav_buttons[key] = btn
-        
+
         # Separator
         separator = QFrame()
         separator.setFrameShape(QFrame.Shape.HLine)
-        separator.setStyleSheet("color: rgba(255,255,255,0.1);")
+        separator.setStyleSheet("background: rgba(255,255,255,0.08);")
+        separator.setFixedHeight(1)
         layout.addWidget(separator)
-        
+        layout.addSpacing(8)
+
         # Backup button
-        backup_btn = QPushButton("💾 Бэкап")
+        backup_btn = QPushButton("💾  Бэкап")
+        backup_btn.setMinimumHeight(42)
+        backup_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        backup_btn.setFont(QFont("Segoe UI", 13))
         backup_btn.setStyleSheet("""
             QPushButton {
                 text-align: left;
-                padding: 12px 15px;
+                padding: 10px 16px;
                 border: none;
-                border-radius: 5px;
-                color: white;
+                border-radius: 8px;
+                color: #cbd5e1;
                 font-size: 13px;
+                margin-bottom: 4px;
             }
             QPushButton:hover {
-                background: rgba(255,255,255,0.1);
+                background: rgba(255,255,255,0.08);
+                color: #f1f5f9;
             }
         """)
         backup_btn.clicked.connect(lambda: self.navigate_to('backup'))
@@ -1018,8 +1180,20 @@ class MainWindow(QMainWindow):
             if password == CONFIG.get('admin_password', '1234567890'):
                 self.is_superuser = True
                 self.auth_btn.setText("✅ Суперпользователь")
-                self.auth_btn.setStyleSheet("background: #10b981; color: white; padding: 8px 15px; border-radius: 5px;")
-                self.statusBar().showMessage("Авторизация успешна")
+                self.auth_btn.setStyleSheet("""
+                    QPushButton {
+                        background: #166534;
+                        color: #4ade80;
+                        border: 1px solid #22c55e;
+                        border-radius: 8px;
+                        padding: 8px 15px;
+                        font-weight: bold;
+                    }
+                    QPushButton:hover {
+                        background: #15803d;
+                    }
+                """)
+                self.statusBar().showMessage("Авторизация успешна — суперпользователь")
                 QMessageBox.information(self, "Успех", "Вы вошли как суперпользователь")
             else:
                 QMessageBox.critical(self, "Ошибка", "Неверный пароль")
@@ -1028,9 +1202,10 @@ class MainWindow(QMainWindow):
         reply = QMessageBox.question(
             self, "Выход",
             "Вы уверены, что хотите выйти?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
         )
-        
+
         if reply == QMessageBox.StandardButton.Yes:
             event.accept()
         else:
@@ -1040,57 +1215,255 @@ class MainWindow(QMainWindow):
 def main():
     app = QApplication(sys.argv)
     app.setStyle('Fusion')
-    
-    # Set application-wide stylesheet
+
+    # Set application-wide stylesheet (Dark theme)
     app.setStyleSheet("""
         QMainWindow {
-            background: #f8fafc;
+            background: #0f172a;
         }
+
         QTableWidget {
-            background: white;
-            gridline-color: #e2e8f0;
-            border: 1px solid #e2e8f0;
-            border-radius: 5px;
+            background: #1e293b;
+            alternate-background-color: #1a2332;
+            gridline-color: #334155;
+            border: 1px solid #334155;
+            border-radius: 10px;
+            color: #f1f5f9;
+            selection-background-color: #3b82f6;
+            selection-color: white;
         }
         QTableWidget::item {
-            padding: 8px;
+            padding: 10px 8px;
+            border-bottom: 1px solid #1e293b;
+        }
+        QTableWidget::item:hover {
+            background: #263545;
         }
         QTableWidget::item:selected {
-            background: #dbeafe;
-            color: black;
+            background: #3b82f6;
+            color: white;
         }
         QHeaderView::section {
-            background: #f1f5f9;
-            padding: 8px;
+            background: #1e293b;
+            color: #94a3b8;
+            padding: 12px 8px;
             border: none;
-            border-bottom: 2px solid #e2e8f0;
+            border-bottom: 2px solid #334155;
             font-weight: bold;
+            font-size: 12px;
+            text-transform: uppercase;
         }
+        QTableWidget QTableCornerButton::section {
+            background: #1e293b;
+            border: 1px solid #334155;
+        }
+        QScrollBar:vertical {
+            background: #1e293b;
+            width: 10px;
+            border-radius: 5px;
+        }
+        QScrollBar::handle:vertical {
+            background: #475569;
+            border-radius: 5px;
+            min-height: 20px;
+        }
+        QScrollBar::handle:vertical:hover {
+            background: #64748b;
+        }
+        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+            height: 0;
+        }
+        QScrollBar:horizontal {
+            background: #1e293b;
+            height: 10px;
+            border-radius: 5px;
+        }
+        QScrollBar::handle:horizontal {
+            background: #475569;
+            border-radius: 5px;
+            min-width: 20px;
+        }
+        QScrollBar::handle:horizontal:hover {
+            background: #64748b;
+        }
+        QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+            width: 0;
+        }
+
         QPushButton {
-            background: #2563eb;
+            background: #3b82f6;
             color: white;
             border: none;
-            border-radius: 5px;
-            padding: 8px 15px;
+            border-radius: 8px;
+            padding: 10px 18px;
             font-size: 13px;
+            font-weight: 500;
         }
         QPushButton:hover {
-            background: #1e40af;
+            background: #2563eb;
         }
-        QLineEdit, QComboBox, QSpinBox, QDateEdit, QTextEdit {
-            padding: 6px;
-            border: 1px solid #e2e8f0;
-            border-radius: 4px;
+        QPushButton:pressed {
+            background: #1d4ed8;
         }
+        QPushButton:disabled {
+            background: #475569;
+            color: #94a3b8;
+        }
+
+        QLineEdit {
+            padding: 10px 14px;
+            background: #1e293b;
+            color: #f1f5f9;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            font-size: 13px;
+        }
+        QLineEdit:focus {
+            border-color: #3b82f6;
+        }
+        QLineEdit::placeholder {
+            color: #64748b;
+        }
+
+        QComboBox {
+            padding: 10px 14px;
+            background: #1e293b;
+            color: #f1f5f9;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            font-size: 13px;
+        }
+        QComboBox:hover {
+            border-color: #3b82f6;
+        }
+        QComboBox:focus {
+            border-color: #3b82f6;
+        }
+        QComboBox::drop-down {
+            border: none;
+            padding-right: 8px;
+        }
+        QComboBox QAbstractItemView {
+            background: #1e293b;
+            color: #f1f5f9;
+            selection-background-color: #3b82f6;
+            border: 1px solid #334155;
+        }
+
+        QSpinBox, QDateEdit, QDateTimeEdit {
+            padding: 10px 14px;
+            background: #1e293b;
+            color: #f1f5f9;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            font-size: 13px;
+        }
+        QSpinBox:hover, QDateEdit:hover, QDateTimeEdit:hover {
+            border-color: #3b82f6;
+        }
+        QSpinBox:focus, QDateEdit:focus, QDateTimeEdit:focus {
+            border-color: #3b82f6;
+        }
+        QSpinBox::up-button, QDateEdit::up-button, QDateTimeEdit::up-button {
+            background: #334155;
+            border-radius: 6px;
+        }
+        QSpinBox::down-button, QDateEdit::down-button, QDateTimeEdit::down-button {
+            background: #334155;
+            border-radius: 6px;
+        }
+
+        QTextEdit {
+            padding: 10px 14px;
+            background: #1e293b;
+            color: #f1f5f9;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            font-size: 13px;
+        }
+        QTextEdit:focus {
+            border-color: #3b82f6;
+        }
+
         QLabel {
-            color: #0f172a;
+            color: #f1f5f9;
         }
+
         QGroupBox {
             font-weight: bold;
+            color: #f1f5f9;
+            border: 1px solid #334155;
+            border-radius: 10px;
+            margin-top: 12px;
+            padding-top: 16px;
         }
+        QGroupBox::title {
+            subcontrol-origin: margin;
+            left: 12px;
+            padding: 0 6px;
+            color: #94a3b8;
+        }
+
+        QStackedWidget {
+            background: #0f172a;
+        }
+
+        QDialog {
+            background: #1e293b;
+        }
+        QDialog QLabel {
+            color: #f1f5f9;
+        }
+
+        QMessageBox QLabel {
+            color: #f1f5f9;
+        }
+        QMessageBox {
+            background: #1e293b;
+        }
+
+        QInputDialog {
+            background: #1e293b;
+        }
+
         QStatusBar {
-            background: #f1f5f9;
-            color: #64748b;
+            background: #1e293b;
+            color: #94a3b8;
+            border-top: 1px solid #334155;
+        }
+
+        QToolTip {
+            background: #1e293b;
+            color: #f1f5f9;
+            border: 1px solid #334155;
+            border-radius: 4px;
+            padding: 6px;
+        }
+
+        QMenu {
+            background: #1e293b;
+            color: #f1f5f9;
+            border: 1px solid #334155;
+            border-radius: 6px;
+            padding: 4px;
+        }
+        QMenu::item {
+            padding: 8px 24px 8px 12px;
+            border-radius: 4px;
+        }
+        QMenu::item:selected {
+            background: #334155;
+        }
+        QMenuBar {
+            background: #1e293b;
+            border-bottom: 1px solid #334155;
+        }
+        QMenuBar::item {
+            padding: 8px 12px;
+            border-radius: 4px;
+        }
+        QMenuBar::item:selected {
+            background: #334155;
         }
     """)
     
