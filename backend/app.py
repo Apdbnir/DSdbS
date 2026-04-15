@@ -5,6 +5,7 @@ Educational Process Management System - Desktop Application (PyQt6)
 import sys
 import json
 import os
+import logging
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QTableWidget, QTableWidgetItem, QPushButton, QLabel, QLineEdit,
@@ -17,12 +18,15 @@ from PyQt6.QtCore import Qt, QDate, QTime, QSize
 from PyQt6.QtGui import QAction, QIcon, QFont, QColor, QPixmap
 import psycopg2
 import psycopg2.extras
+from logging_config import setup_logging
 from datetime import datetime
 
 # Load configuration
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), 'config.json')
 with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
     CONFIG = json.load(f)
+
+logger = setup_logging(__name__, 'app.log')
 
 
 class DatabaseManager:
@@ -33,17 +37,40 @@ class DatabaseManager:
         self.lookup_tables = CONFIG.get('lookup_tables', [])
     
     def get_connection(self):
-        return psycopg2.connect(
-            host=self.db_config['host'],
-            port=self.db_config['port'],
-            dbname=self.db_config['name'],
-            user=self.db_config['user'],
-            password=self.db_config['password'],
-            client_encoding='utf8'
-        )
+        host = str(self.db_config['host'])
+        port = str(self.db_config['port'])
+        dbname = str(self.db_config['name'])
+        user = str(self.db_config['user'])
+        password = str(self.db_config['password'])
+
+        connect_kwargs = {
+            'host': host,
+            'port': port,
+            'dbname': dbname,
+            'user': user,
+            'password': password
+        }
+        masked_dsn = f"host={host} port={port} dbname={dbname} user={user} password=***"
+        logger.debug('Connecting to PostgreSQL DSN=%r', masked_dsn)
+        try:
+            conn = psycopg2.connect(**connect_kwargs)
+            conn.set_client_encoding('UTF8')
+            return conn
+        except UnicodeDecodeError as e:
+            logger.warning('UnicodeDecodeError while connecting, retrying with LATIN1: %s', e)
+            try:
+                conn = psycopg2.connect(options='-c client_encoding=LATIN1', **connect_kwargs)
+                conn.set_client_encoding('LATIN1')
+                return conn
+            except Exception as inner_e:
+                logger.warning('Retry with LATIN1 failed: %s', inner_e)
+                conn = psycopg2.connect(options='-c client_encoding=WIN1251', **connect_kwargs)
+                conn.set_client_encoding('WIN1251')
+                return conn
     
     def execute_query(self, query, params=None, fetch=True):
         conn = None
+        logger.info('Executing query: %s params=%s', query, params)
         try:
             conn = self.get_connection()
             cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
@@ -64,6 +91,7 @@ class DatabaseManager:
             if conn:
                 conn.rollback()
                 conn.close()
+            logger.exception('Database error')
             raise
     
     def _serialize_row(self, row):
@@ -71,12 +99,16 @@ class DatabaseManager:
         for key, value in row.items():
             if hasattr(value, 'isoformat'):
                 serialized[key] = value.isoformat()
-            elif isinstance(value, str):
-                # Ensure string is valid UTF-8
+            elif isinstance(value, bytes):
                 try:
-                    serialized[key] = value.encode('utf-8').decode('utf-8')
-                except (UnicodeEncodeError, UnicodeDecodeError):
-                    serialized[key] = value.encode('cp1251', errors='replace').decode('utf-8', errors='replace')
+                    serialized[key] = value.decode('utf-8')
+                except UnicodeDecodeError:
+                    try:
+                        serialized[key] = value.decode('cp1251')
+                    except UnicodeDecodeError:
+                        serialized[key] = value.decode('utf-8', errors='replace')
+            elif isinstance(value, str):
+                serialized[key] = value
             else:
                 serialized[key] = value
         return serialized
@@ -602,9 +634,11 @@ class DataTableWidget(QWidget):
     
     def load_data(self, filters=None):
         try:
+            logger.info('Loading data for table %s filters=%s', self.table_name, filters)
             self.current_data = self.db.get_all(self.table_name, filters)
             self.populate_table()
         except Exception as e:
+            logger.exception('Failed to load data for table %s', self.table_name)
             QMessageBox.critical(self, "Ошибка", f"Не удалось загрузить данные:\n{str(e)}")
     
     def populate_table(self):
@@ -686,10 +720,12 @@ class DataTableWidget(QWidget):
         if dialog.exec() == QDialog.DialogCode.Accepted:
             try:
                 data = dialog.get_values()
+                logger.info('Creating record in %s: %s', self.table_name, data)
                 self.db.create(self.table_name, data)
                 QMessageBox.information(self, "Успех", "Запись успешно добавлена")
                 self.load_data()
             except Exception as e:
+                logger.exception('Failed to add record to %s', self.table_name)
                 QMessageBox.critical(self, "Ошибка", f"Не удалось добавить запись:\n{str(e)}")
     
     def edit_record(self):
@@ -709,11 +745,12 @@ class DataTableWidget(QWidget):
                 data = dialog.get_values()
                 pk = config['primary_key']
                 record_id = record[pk] if isinstance(pk, str) else record[pk[0]]
-                
+                logger.info('Updating record %s in %s: %s', record_id, self.table_name, data)
                 self.db.update(self.table_name, record_id, data)
                 QMessageBox.information(self, "Успех", "Запись успешно обновлена")
                 self.load_data()
             except Exception as e:
+                logger.exception('Failed to update record %s in %s', record_id, self.table_name)
                 QMessageBox.critical(self, "Ошибка", f"Не удалось обновить запись:\n{str(e)}")
     
     def delete_record(self):
@@ -737,11 +774,12 @@ class DataTableWidget(QWidget):
             try:
                 pk = config['primary_key']
                 record_id = record[pk] if isinstance(pk, str) else record[pk[0]]
-                
+                logger.info('Deleting record %s from %s', record_id, self.table_name)
                 self.db.delete(self.table_name, record_id)
                 QMessageBox.information(self, "Успех", "Запись успешно удалена")
                 self.load_data()
             except Exception as e:
+                logger.exception('Failed to delete record %s from %s', record_id, self.table_name)
                 QMessageBox.critical(self, "Ошибка", f"Не удалось удалить запись:\n{str(e)}")
 
 
@@ -837,7 +875,7 @@ class DashboardWidget(QWidget):
                     col = 0
                     row += 1
         except Exception as e:
-            print(f"Failed to load stats: {e}")
+            logger.exception('Failed to load statistics')
     
     def create_stat_card(self, icon, label, count):
         card = QGroupBox()
@@ -941,6 +979,7 @@ class BackupWidget(QWidget):
         
         QApplication.processEvents()
         
+        logger.info('Creating backup requested by user')
         result = self.db.create_backup()
         
         if result['status'] == 'success':
@@ -1201,8 +1240,10 @@ class MainWindow(QMainWindow):
                     }
                 """)
                 self.statusBar().showMessage("Авторизация успешна — суперпользователь")
+                logger.info('Superuser successfully authenticated')
                 QMessageBox.information(self, "Успех", "Вы вошли как суперпользователь")
             else:
+                logger.warning('Superuser authentication failed')
                 QMessageBox.critical(self, "Ошибка", "Неверный пароль")
     
     def closeEvent(self, event):
@@ -1220,6 +1261,7 @@ class MainWindow(QMainWindow):
 
 
 def main():
+    logger.info('Application starting')
     app = QApplication(sys.argv)
     app.setStyle('Fusion')
 

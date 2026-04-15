@@ -14,25 +14,14 @@ from datetime import datetime
 import psycopg2
 import psycopg2.extras
 from psycopg2.extras import RealDictCursor
+from logging_config import setup_logging
 
 # Load configuration
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), 'config.json')
 with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
     CONFIG = json.load(f)
 
-# Setup logging
-LOG_DIR = os.path.join(os.path.dirname(__file__), '..', 'logs')
-os.makedirs(LOG_DIR, exist_ok=True)
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler(os.path.join(LOG_DIR, 'server.log'), encoding='utf-8'),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger(__name__)
+logger = setup_logging(__name__, 'server.log')
 
 # Table configuration
 TABLES = {
@@ -108,13 +97,36 @@ class DatabaseManager:
     
     def get_connection(self):
         """Get database connection"""
-        return psycopg2.connect(
-            host=self.db_config['host'],
-            port=self.db_config['port'],
-            dbname=self.db_config['name'],
-            user=self.db_config['user'],
-            password=self.db_config['password']
-        )
+        host = str(self.db_config['host'])
+        port = str(self.db_config['port'])
+        dbname = str(self.db_config['name'])
+        user = str(self.db_config['user'])
+        password = str(self.db_config['password'])
+
+        connect_kwargs = {
+            'host': host,
+            'port': port,
+            'dbname': dbname,
+            'user': user,
+            'password': password
+        }
+        masked_dsn = f"host={host} port={port} dbname={dbname} user={user} password=***"
+        logger.debug('Connecting to PostgreSQL DSN=%r', masked_dsn)
+        try:
+            conn = psycopg2.connect(**connect_kwargs)
+            conn.set_client_encoding('UTF8')
+            return conn
+        except UnicodeDecodeError as e:
+            logger.warning('UnicodeDecodeError while connecting, retrying with LATIN1: %s', e)
+            try:
+                conn = psycopg2.connect(options='-c client_encoding=LATIN1', **connect_kwargs)
+                conn.set_client_encoding('LATIN1')
+                return conn
+            except Exception as inner_e:
+                logger.warning('Retry with LATIN1 failed: %s', inner_e)
+                conn = psycopg2.connect(options='-c client_encoding=WIN1251', **connect_kwargs)
+                conn.set_client_encoding('WIN1251')
+                return conn
     
     def execute_query(self, query, params=None, fetch=True):
         """Execute a database query"""
@@ -362,6 +374,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         """Handle GET requests"""
         try:
             path, query = self._parse_url()
+            logger.info('GET %s query=%s', path, query)
             table_name, record_id = self._get_table_from_path(path)
             
             if not table_name or table_name not in TABLES:
@@ -402,6 +415,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         """Handle POST requests"""
         try:
             path, _ = self._parse_url()
+            logger.info('POST %s', path)
             table_name, _ = self._get_table_from_path(path)
             
             if not table_name or table_name not in TABLES:
@@ -448,6 +462,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         """Handle PUT requests"""
         try:
             path, _ = self._parse_url()
+            logger.info('PUT %s', path)
             table_name, record_id = self._get_table_from_path(path)
             
             if not table_name or table_name not in TABLES:
@@ -488,6 +503,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         """Handle DELETE requests"""
         try:
             path, _ = self._parse_url()
+            logger.info('DELETE %s', path)
             table_name, record_id = self._get_table_from_path(path)
             
             if not table_name or table_name not in TABLES:
