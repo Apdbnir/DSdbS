@@ -9,15 +9,20 @@ import logging
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QTableWidget, QTableWidgetItem, QPushButton, QLabel, QLineEdit,
-    QComboBox, QSpinBox, QDateEdit, QTextEdit, QDialog, QFormLayout,
+    QComboBox, QSpinBox, QDateEdit, QTextEdit, QPlainTextEdit, QDialog, QFormLayout,
     QDialogButtonBox, QMessageBox, QHeaderView, QSplitter, QTreeWidget,
     QTreeWidgetItem, QStackedWidget, QToolBar, QStatusBar, QInputDialog,
     QFileDialog, QFrame, QGroupBox, QGridLayout, QTabWidget
 )
 from PyQt6.QtCore import Qt, QDate, QTime, QSize
 from PyQt6.QtGui import QAction, QIcon, QFont, QColor, QPixmap
-import psycopg2
-import psycopg2.extras
+try:
+    import pg8000
+except ImportError as e:
+    raise ImportError(
+        "pg8000 is not installed for the active Python interpreter. "
+        "Activate backend\\venv or use backend\\venv\\Scripts\\python.exe to run app.py."
+    ) from e
 from logging_config import setup_logging
 from datetime import datetime
 
@@ -38,47 +43,40 @@ class DatabaseManager:
     
     def get_connection(self):
         host = str(self.db_config['host'])
-        port = str(self.db_config['port'])
+        port = int(self.db_config['port'])
         dbname = str(self.db_config['name'])
         user = str(self.db_config['user'])
         password = str(self.db_config['password'])
 
-        connect_kwargs = {
-            'host': host,
-            'port': port,
-            'dbname': dbname,
-            'user': user,
-            'password': password
-        }
-        masked_dsn = f"host={host} port={port} dbname={dbname} user={user} password=***"
-        logger.debug('Connecting to PostgreSQL DSN=%r', masked_dsn)
+        logger.debug('Connecting to PostgreSQL host=%r port=%r dbname=%r user=%r', host, port, dbname, user)
         try:
-            conn = psycopg2.connect(**connect_kwargs)
-            conn.set_client_encoding('UTF8')
-            return conn
-        except UnicodeDecodeError as e:
-            logger.warning('UnicodeDecodeError while connecting, retrying with LATIN1: %s', e)
-            try:
-                conn = psycopg2.connect(options='-c client_encoding=LATIN1', **connect_kwargs)
-                conn.set_client_encoding('LATIN1')
-                return conn
-            except Exception as inner_e:
-                logger.warning('Retry with LATIN1 failed: %s', inner_e)
-                conn = psycopg2.connect(options='-c client_encoding=WIN1251', **connect_kwargs)
-                conn.set_client_encoding('WIN1251')
-                return conn
+            return pg8000.connect(
+                host=host,
+                port=port,
+                database=dbname,
+                user=user,
+                password=password
+            )
+        except pg8000.dbapi.ProgrammingError as e:
+            err = e.args[0] if e.args else None
+            if isinstance(err, dict) and err.get('C') == '3D000':
+                raise RuntimeError(
+                    f"Database '{dbname}' does not exist. Run start.bat or database\\setup_database.bat to create it."
+                ) from e
+            raise
     
     def execute_query(self, query, params=None, fetch=True):
         conn = None
         logger.info('Executing query: %s params=%s', query, params)
         try:
             conn = self.get_connection()
-            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-            cursor.execute(query, params)
-            
+            cursor = conn.cursor()
+            cursor.execute(query, params or ())
+
             if fetch:
-                result = cursor.fetchall()
-                result = [self._serialize_row(row) for row in result]
+                columns = [desc[0] for desc in cursor.description] if cursor.description else []
+                rows = cursor.fetchall()
+                result = [self._serialize_row(dict(zip(columns, row))) for row in rows]
                 cursor.close()
                 conn.close()
                 return result
@@ -87,7 +85,7 @@ class DatabaseManager:
                 cursor.close()
                 conn.close()
                 return True
-        except Exception as e:
+        except Exception:
             if conn:
                 conn.rollback()
                 conn.close()
@@ -371,6 +369,70 @@ TABLES = {
         ]
     }
 }
+
+SPECIAL_QUERIES = [
+    {'name': 'Все сотрудники (первые 50)', 'sql': 'SELECT id, name, experience, email, phone, position_id FROM public.employees ORDER BY id LIMIT 50;'},
+    {'name': 'Все ученики (первые 50)', 'sql': 'SELECT id, passport_number, full_name, medical_certificate, age, group_id FROM public.students ORDER BY id LIMIT 50;'},
+    {'name': 'Все занятия (первые 50)', 'sql': 'SELECT id, name, topic, lesson_date, lesson_time, result, contact_email FROM public.lessons ORDER BY lesson_date DESC, lesson_time DESC LIMIT 50;'},
+    {'name': 'Список групп', 'sql': 'SELECT id, group_number, room_number, format_type FROM public.groups ORDER BY id;'},
+    {'name': 'Список должностей', 'sql': 'SELECT id, name, phone, employment_type, notes FROM public.positions ORDER BY id;'},
+    {'name': 'Список мест проведения', 'sql': 'SELECT id, geolocation, location_type, address, responsible_employee_id FROM public.locations ORDER BY id;'},
+    {'name': 'Список автомобилей', 'sql': 'SELECT id, vehicle_number, route, notes, category FROM public.vehicles ORDER BY id;'},
+    {'name': 'Список форм обучения', 'sql': 'SELECT id, name FROM public.lesson_formats ORDER BY id;'},
+    {'name': 'Количество сотрудников', 'sql': 'SELECT COUNT(*) AS employee_count FROM public.employees;'},
+    {'name': 'Количество учеников', 'sql': 'SELECT COUNT(*) AS student_count FROM public.students;'},
+    {'name': 'Количество занятий', 'sql': 'SELECT COUNT(*) AS lesson_count FROM public.lessons;'},
+    {'name': 'Количество групп по формату', 'sql': 'SELECT format_type, COUNT(*) AS group_count FROM public.groups GROUP BY format_type ORDER BY group_count DESC;'},
+    {'name': 'Количество уроков по формату', 'sql': 'SELECT lf.name AS format_name, COUNT(*) AS lessons_count FROM public.lessons l JOIN public.lesson_formats lf ON l.format_id = lf.id GROUP BY lf.name ORDER BY lessons_count DESC;'},
+    {'name': 'Количество уроков по локациям', 'sql': 'SELECT location_id, COUNT(*) AS lessons_count FROM public.lessons GROUP BY location_id ORDER BY lessons_count DESC;'},
+    {'name': 'Сотрудники по стажу', 'sql': 'SELECT id, name, experience, position_id FROM public.employees ORDER BY experience DESC LIMIT 50;'},
+    {'name': 'Ученики по возрасту', 'sql': 'SELECT id, full_name, age, group_id FROM public.students ORDER BY age DESC LIMIT 50;'},
+    {'name': 'Занятия без автомобиля', 'sql': 'SELECT id, name, topic, lesson_date, lesson_time, employee_id FROM public.lessons WHERE vehicle_id IS NULL ORDER BY lesson_date DESC LIMIT 50;'},
+    {'name': 'Занятия с результатом «Не зачтено»', 'sql': 'SELECT id, name, topic, lesson_date, lesson_time, result FROM public.lessons WHERE result ILIKE ''%Не зачтено%'' ORDER BY lesson_date DESC LIMIT 50;'},
+    {'name': 'Занятия c датой в ближайшие 30 дней', 'sql': 'SELECT id, name, topic, lesson_date, lesson_time FROM public.lessons WHERE lesson_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL ''30 days'' ORDER BY lesson_date, lesson_time;'},
+    {'name': 'Ученики 18-25 лет', 'sql': 'SELECT id, full_name, age, group_id FROM public.students WHERE age BETWEEN 18 AND 25 ORDER BY age, full_name;'},
+    {'name': 'Группы в аудитории 101', 'sql': 'SELECT id, group_number, room_number, format_type FROM public.groups WHERE room_number = ''101'';'},
+    {'name': 'Автомобили категории B', 'sql': 'SELECT id, vehicle_number, route, notes FROM public.vehicles WHERE category = ''B'' ORDER BY vehicle_number;'},
+    {'name': 'Места типа «Аудитория»', 'sql': 'SELECT id, address, location_type, responsible_employee_id FROM public.locations WHERE location_type ILIKE ''%Аудитория%'' ORDER BY id;'},
+    {'name': 'Сотрудники с email на gmail', 'sql': 'SELECT id, name, email, phone FROM public.employees WHERE email ILIKE ''%gmail.com'' ORDER BY name;'},
+    {'name': 'Студенты с медсправкой отсутствует', 'sql': 'SELECT id, full_name, medical_certificate, age FROM public.students WHERE medical_certificate ILIKE ''%Отсутствует%'' ORDER BY full_name;'},
+    {'name': 'Связь сотрудников и должностей', 'sql': 'SELECT e.id, e.name AS employee, p.name AS position FROM public.employees e JOIN public.positions p ON e.position_id = p.id ORDER BY e.name LIMIT 50;'},
+    {'name': 'Занятия с форматами обучения', 'sql': 'SELECT l.id, l.name, lf.name AS format_name, l.lesson_date, l.lesson_time FROM public.lessons l JOIN public.lesson_formats lf ON l.format_id = lf.id ORDER BY l.lesson_date DESC LIMIT 50;'},
+    {'name': 'Занятия с адресами локаций', 'sql': 'SELECT l.id, l.name, loc.address, l.lesson_date, l.lesson_time FROM public.lessons l JOIN public.locations loc ON l.location_id = loc.id ORDER BY l.lesson_date DESC LIMIT 50;'},
+    {'name': 'Занятия с инструкторами', 'sql': 'SELECT l.id, l.name, e.name AS instructor, l.lesson_date, l.lesson_time FROM public.lessons l JOIN public.employees e ON l.employee_id = e.id ORDER BY l.lesson_date DESC LIMIT 50;'},
+    {'name': 'Ученики по группам', 'sql': 'SELECT s.id, s.full_name, g.group_number FROM public.students s JOIN public.groups g ON s.group_id = g.id ORDER BY g.group_number, s.full_name LIMIT 50;'},
+    {'name': 'Количество учеников в каждой группе', 'sql': 'SELECT g.group_number, COUNT(s.id) AS student_count FROM public.groups g LEFT JOIN public.students s ON s.group_id = g.id GROUP BY g.group_number ORDER BY student_count DESC;'},
+    {'name': 'Количество уроков на каждого инструктора', 'sql': 'SELECT e.name AS instructor, COUNT(l.id) AS lessons_count FROM public.employees e LEFT JOIN public.lessons l ON l.employee_id = e.id GROUP BY e.name ORDER BY lessons_count DESC LIMIT 50;'},
+    {'name': 'Список маршрутов автомобилей', 'sql': 'SELECT id, vehicle_number, route, category FROM public.vehicles ORDER BY id;'},
+    {'name': 'Отличающиеся результаты уроков', 'sql': 'SELECT DISTINCT result FROM public.lessons ORDER BY result;'},
+    {'name': 'Группы со смешанным форматом', 'sql': 'SELECT id, group_number, room_number, format_type FROM public.groups WHERE format_type ILIKE ''%Смешанно%'';'},
+    {'name': 'Адреса онлайн-платформ', 'sql': 'SELECT id, address, location_type FROM public.locations WHERE address ILIKE ''%Zoom%'' OR address ILIKE ''%Moodle%'';'},
+    {'name': 'Автомобили с заметками', 'sql': "SELECT id, vehicle_number, route, notes FROM public.vehicles WHERE notes IS NOT NULL AND notes <> '' ORDER BY id;"},
+    {'name': 'Сотрудники с наибольшим стажем', 'sql': 'SELECT id, name, experience FROM public.employees ORDER BY experience DESC LIMIT 25;'},
+    {'name': 'Последние 50 записей по дате занятия', 'sql': 'SELECT id, name, lesson_date, lesson_time, result FROM public.lessons ORDER BY lesson_date DESC, lesson_time DESC LIMIT 50;'},
+    {'name': 'Уроки без результата', 'sql': 'SELECT id, name, topic, lesson_date, lesson_time FROM public.lessons WHERE result IS NULL ORDER BY lesson_date DESC LIMIT 50;'},
+    {'name': 'Студенты с паспортом по группе', 'sql': 'SELECT id, full_name, passport_number, group_id FROM public.students ORDER BY group_id, full_name LIMIT 50;'},
+    {'name': 'Сотрудники, не являющиеся инструкторами', 'sql': 'SELECT id, name, position_id FROM public.employees WHERE position_id <> 9 ORDER BY name LIMIT 50;'},
+    {'name': 'Группы по номеру аудитории', 'sql': 'SELECT group_number, room_number, format_type FROM public.groups ORDER BY room_number, group_number;'},
+    {'name': 'Форматы обучения и количество уроков', 'sql': 'SELECT lf.name AS format_name, COUNT(l.id) AS lessons_count FROM public.lesson_formats lf LEFT JOIN public.lessons l ON l.format_id = lf.id GROUP BY lf.name ORDER BY lessons_count DESC;'},
+    {'name': 'Локации и ответственные сотрудники', 'sql': 'SELECT loc.address, loc.location_type, e.name AS responsible FROM public.locations loc LEFT JOIN public.employees e ON loc.responsible_employee_id = e.id ORDER BY loc.address LIMIT 50;'},
+    {'name': 'Автомобили по категориям и маршрутам', 'sql': 'SELECT category, vehicle_number, route FROM public.vehicles ORDER BY category, vehicle_number;'},
+    {'name': 'Все уроки с датой и временем', 'sql': 'SELECT id, name, lesson_date, lesson_time, result FROM public.lessons ORDER BY lesson_date, lesson_time LIMIT 100;'},
+    {'name': 'Список всех email сотрудников', 'sql': 'SELECT id, name, email FROM public.employees WHERE email IS NOT NULL ORDER BY name LIMIT 100;'},
+    {'name': 'Студенты по номеру паспорта', 'sql': 'SELECT id, full_name, passport_number FROM public.students ORDER BY passport_number LIMIT 100;'},
+    {'name': 'Сотрудники с телефонным номером', 'sql': 'SELECT id, name, phone FROM public.employees WHERE phone IS NOT NULL ORDER BY name;'},
+    {'name': 'Занятия по теме и месту', 'sql': 'SELECT l.id, l.topic, loc.address, l.lesson_date FROM public.lessons l JOIN public.locations loc ON l.location_id = loc.id ORDER BY l.lesson_date DESC LIMIT 50;'},
+    {'name': 'Группы, имеющие формат «Дистанционно»', 'sql': 'SELECT id, group_number, room_number, format_type FROM public.groups WHERE format_type ILIKE ''%Дистанционно%'';'},
+    {'name': 'Ученики старше 25 лет', 'sql': 'SELECT id, full_name, age, group_id FROM public.students WHERE age > 25 ORDER BY age DESC LIMIT 50;'},
+    {'name': 'Все заметки по позициям', 'sql': 'SELECT id, name, employment_type, notes FROM public.positions WHERE notes IS NOT NULL ORDER BY id;'},
+    {'name': 'Подробный список уроков с форматом и инструктором', 'sql': 'SELECT l.id, l.name, lf.name AS format_name, e.name AS instructor, l.lesson_date, l.lesson_time FROM public.lessons l JOIN public.lesson_formats lf ON l.format_id = lf.id JOIN public.employees e ON l.employee_id = e.id ORDER BY l.lesson_date DESC LIMIT 50;'},
+    {'name': 'Пять уроков с ближайшей датой', 'sql': 'SELECT id, name, lesson_date, lesson_time FROM public.lessons WHERE lesson_date >= CURRENT_DATE ORDER BY lesson_date, lesson_time LIMIT 5;'},
+    {'name': 'Количество учеников по каждой группе', 'sql': 'SELECT g.group_number, COUNT(s.id) AS student_count FROM public.groups g LEFT JOIN public.students s ON s.group_id = g.id GROUP BY g.group_number ORDER BY g.group_number;'},
+    {'name': 'Список всех адресов локаций', 'sql': 'SELECT id, address FROM public.locations ORDER BY id;'},
+    {'name': 'Прочитать только первые 20 строк из lessons', 'sql': 'SELECT * FROM public.lessons ORDER BY id LIMIT 20;'},
+    {'name': 'Список всех уникальных категорий автомобилей', 'sql': 'SELECT DISTINCT category FROM public.vehicles ORDER BY category;'},
+    {'name': 'Поиск студентов по группе 1', 'sql': 'SELECT id, full_name, age FROM public.students WHERE group_id = 1 ORDER BY full_name;'},
+]
 
 
 class RecordDialog(QDialog):
@@ -916,6 +978,154 @@ class DashboardWidget(QWidget):
         return card
 
 
+class SqlQueryWidget(QWidget):
+    """Page for executing custom SQL and prepared queries"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.db = DatabaseManager()
+        self.main_window = parent
+        self.setup_ui()
+
+    def setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setSpacing(12)
+
+        title = QLabel("🧪 SQL-запросы")
+        title.setFont(QFont("Segoe UI", 22, QFont.Weight.Bold))
+        title.setStyleSheet("color: #f1f5f9; padding: 8px 0;")
+        layout.addWidget(title)
+
+        info = QLabel(
+            "Выберите один из готовых запросов или введите свой SQL-запрос ниже, затем нажмите \"Выполнить\"."
+        )
+        info.setWordWrap(True)
+        info.setFont(QFont("Segoe UI", 12))
+        info.setStyleSheet("color: #94a3b8; padding: 8px;")
+        layout.addWidget(info)
+
+        control_layout = QHBoxLayout()
+        control_layout.setSpacing(10)
+
+        self.query_combo = QComboBox()
+        self.query_combo.setMinimumHeight(40)
+        self.query_combo.setFont(QFont("Segoe UI", 11))
+        for query in SPECIAL_QUERIES:
+            self.query_combo.addItem(query['name'])
+        self.query_combo.currentIndexChanged.connect(self.load_selected_query)
+        control_layout.addWidget(self.query_combo)
+
+        btn_load = QPushButton("Загрузить запрос")
+        btn_load.setMinimumHeight(40)
+        btn_load.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_load.clicked.connect(self.load_selected_query)
+        control_layout.addWidget(btn_load)
+
+        btn_run = QPushButton("Выполнить запрос")
+        btn_run.setMinimumHeight(40)
+        btn_run.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_run.clicked.connect(self.execute_current_query)
+        control_layout.addWidget(btn_run)
+
+        btn_clear = QPushButton("Очистить")
+        btn_clear.setMinimumHeight(40)
+        btn_clear.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_clear.clicked.connect(self.clear_query)
+        control_layout.addWidget(btn_clear)
+
+        layout.addLayout(control_layout)
+
+        self.query_editor = QPlainTextEdit()
+        self.query_editor.setPlaceholderText("Введите SQL-запрос здесь...")
+        self.query_editor.setMinimumHeight(220)
+        self.query_editor.setFont(QFont("Segoe UI", 11))
+        layout.addWidget(self.query_editor)
+
+        result_label = QLabel("Результаты запроса")
+        result_label.setFont(QFont("Segoe UI", 14, QFont.Weight.Bold))
+        result_label.setStyleSheet("color: #f1f5f9; padding: 8px 0;")
+        layout.addWidget(result_label)
+
+        self.result_table = QTableWidget()
+        self.result_table.setAlternatingRowColors(True)
+        self.result_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.result_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.result_table.setMinimumHeight(280)
+        self.result_table.setFont(QFont("Segoe UI", 11))
+        layout.addWidget(self.result_table)
+
+        self.status_label = QLabel()
+        self.status_label.setWordWrap(True)
+        self.status_label.setFont(QFont("Segoe UI", 11))
+        self.status_label.setStyleSheet("padding: 12px; background: #1e293b; border-radius: 8px; border: 1px solid #334155; color: #94a3b8;")
+        layout.addWidget(self.status_label)
+
+        layout.addStretch()
+        self.load_selected_query()
+
+    def load_selected_query(self):
+        idx = self.query_combo.currentIndex()
+        if idx >= 0 and idx < len(SPECIAL_QUERIES):
+            self.query_editor.setPlainText(SPECIAL_QUERIES[idx]['sql'])
+            self.status_label.setText(f"Загружен запрос: {SPECIAL_QUERIES[idx]['name']}")
+        else:
+            self.query_editor.clear()
+            self.status_label.setText('')
+
+    def clear_query(self):
+        self.query_editor.clear()
+        self.result_table.clear()
+        self.result_table.setRowCount(0)
+        self.result_table.setColumnCount(0)
+        self.status_label.setText('Поле запроса очищено.')
+
+    def execute_current_query(self):
+        query = self.query_editor.toPlainText().strip()
+        if not query:
+            QMessageBox.warning(self, "Ошибка", "Введите SQL-запрос перед выполнением.")
+            return
+
+        command = query.lstrip().split()[0].upper()
+        fetch = command in ('SELECT', 'WITH', 'SHOW', 'EXPLAIN', 'VALUES') or 'RETURNING' in query.upper()
+
+        try:
+            logger.info('Executing custom SQL query from query page')
+            result = self.db.execute_query(query, fetch=fetch)
+            if fetch:
+                self.display_query_results(result)
+                self.status_label.setText(f"Запрос выполнен. Найдено строк: {len(result)}")
+            else:
+                self.result_table.clear()
+                self.result_table.setRowCount(0)
+                self.result_table.setColumnCount(0)
+                self.status_label.setText("Запрос выполнен успешно.")
+                QMessageBox.information(self, "Успех", "Запрос успешно выполнен.")
+        except Exception as e:
+            logger.exception('Failed to execute SQL query')
+            self.status_label.setText(f"Ошибка выполнения запроса: {str(e)}")
+            QMessageBox.critical(self, "Ошибка", f"Не удалось выполнить запрос:\n{str(e)}")
+
+    def display_query_results(self, rows):
+        self.result_table.clear()
+        if not rows:
+            self.result_table.setRowCount(0)
+            self.result_table.setColumnCount(0)
+            return
+
+        headers = list(rows[0].keys())
+        self.result_table.setColumnCount(len(headers))
+        self.result_table.setHorizontalHeaderLabels(headers)
+        self.result_table.setRowCount(len(rows))
+
+        for row_idx, row in enumerate(rows):
+            for col_idx, header in enumerate(headers):
+                value = row.get(header)
+                display_value = '' if value is None else str(value)
+                item = QTableWidgetItem(display_value)
+                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                self.result_table.setItem(row_idx, col_idx, item)
+
+
 class BackupWidget(QWidget):
     """Backup management"""
     
@@ -1109,6 +1319,7 @@ class MainWindow(QMainWindow):
             ('locations', '📍  Места проведения'),
             ('vehicles', '🚗  Автомобили'),
             ('lesson-formats', '📋  Формы обучения'),
+            ('queries', '🧪  SQL-запросы'),
         ]
 
         for key, label in nav_items:
@@ -1186,6 +1397,8 @@ class MainWindow(QMainWindow):
             self.show_dashboard()
         elif page == 'backup':
             self.show_backup()
+        elif page == 'queries':
+            self.show_queries()
         else:
             self.show_table(page)
     
@@ -1200,6 +1413,11 @@ class MainWindow(QMainWindow):
         table_widget = DataTableWidget(table_name, self)
         self.set_page_widget(table_widget)
     
+    def show_queries(self):
+        self.page_title.setText("SQL-запросы")
+        queries_widget = SqlQueryWidget(self)
+        self.set_page_widget(queries_widget)
+
     def show_backup(self):
         self.page_title.setText("Резервное копирование")
         backup = BackupWidget(self)

@@ -1,60 +1,54 @@
 """
 Data Generator for Educational Process Management System
-Generates hundreds of records for main tables: employees, cadets, lessons, 
-and association tables: cadet_lessons, group_lessons
+Generates English sample records for main tables: employees, students, lessons,
+and association tables: student_lessons, group_lessons
 """
 
+import os
 import random
 from datetime import datetime, timedelta, date, time
 
 # Random data generators
 FIRST_NAMES_MALE = [
-    'Иванов Алексей', 'Петров Дмитрий', 'Сидоров Сергей', 'Козлов Андрей',
-    'Новиков Николай', 'Морозов Павел', 'Волков Игорь', 'Соколов Максим',
-    'Лебедев Юрий', 'Егоров Артём', 'Попов Владимир', 'Кузнецов Денис',
-    'Смирнов Олег', 'Васильев Игорь', 'Павлов Александр', 'Семёнов Роман',
-    'Голубев Виктор', 'Виноградов Тимур', 'Богданов Илья', 'Воробьёв Фёдор',
-    'Фёдоров Михаил', 'Михайлов Сергей', 'Беляев Андрей', 'Тарасов Олег',
-    'Белов Дмитрий', 'Комаров Никита', 'Орлов Владислав', 'Киселёв Георгий',
-    'Макаров Антон', 'Андреев Вадим'
+    'James', 'John', 'Robert', 'Michael', 'William', 'David', 'Richard',
+    'Charles', 'Joseph', 'Thomas', 'Christopher', 'Daniel', 'Matthew',
+    'Anthony', 'Mark', 'Donald', 'Steven', 'Paul', 'Andrew', 'Joshua',
+    'Kevin', 'Brian', 'George', 'Edward', 'Ronald', 'Timothy', 'Jason',
+    'Jeffrey', 'Ryan', 'Jacob'
 ]
 
 FIRST_NAMES_FEMALE = [
-    'Иванова Мария', 'Петрова Анна', 'Сидорова Елена', 'Козлова Ольга',
-    'Новикова Татьяна', 'Морозова Наталья', 'Волкова Ирина', 'Соколова Светлана',
-    'Лебедева Юлия', 'Егорова Екатерина', 'Попова Валентина', 'Кузнецова Дарья',
-    'Смирнова Виктория', 'Васильева Алина', 'Павлова Ксения', 'Семёнова Полина',
-    'Голубева Вера', 'Виноградова Лариса', 'Богданова Надежда', 'Воробьёва Галина',
-    'Фёдорова Тамара', 'Михайлова Людмила', 'Беляева Зинаида', 'Тарасова Марина',
-    'Белова Жанна', 'Комарова Оксана', 'Орлова Регина', 'Киселёва Валерия',
-    'Макарова Кристина', 'Андреева Диана'
+    'Mary', 'Patricia', 'Jennifer', 'Linda', 'Elizabeth', 'Barbara',
+    'Susan', 'Jessica', 'Sarah', 'Karen', 'Nancy', 'Margaret', 'Lisa',
+    'Betty', 'Dorothy', 'Sandra', 'Ashley', 'Kimberly', 'Donna', 'Emily',
+    'Michelle', 'Carol', 'Amanda', 'Melissa', 'Deborah', 'Stephanie', 'Rebecca',
+    'Sharon', 'Laura', 'Cynthia', 'Kathleen'
 ]
 
 LAST_NAMES = [
-    'Иванов', 'Петров', 'Сидоров', 'Козлов', 'Новиков', 'Морозов', 'Волков',
-    'Соколов', 'Лебедев', 'Егоров', 'Попов', 'Кузнецов', 'Смирнов', 'Васильев',
-    'Павлов', 'Семёнов', 'Голубев', 'Виноградов', 'Богданов', 'Воробьёв'
+    'Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller',
+    'Davis', 'Rodriguez', 'Martinez', 'Hernandez', 'Lopez', 'Gonzalez',
+    'Wilson', 'Anderson', 'Thomas', 'Taylor', 'Moore', 'Jackson', 'Martin'
 ]
 
 TOPICS = [
-    'Введение в специальность', 'Основы безопасности', 'Теоретические основы',
-    'Практические навыки', 'Лабораторная работа №1', 'Лабораторная работа №2',
-    'Контрольная работа', 'Семинар по дисциплине', 'Зачётное занятие',
-    'Подготовка к экзамену', 'Разбор典型ных ошибок', 'Дополнительные материалы',
-    'Самостоятельная работа', 'Групповой проект', 'Индивидуальное задание',
-    'Практикум по вождению', 'Основы управления ТС', 'ПДД: теория',
-    'ПДД: практическое применение', 'Первая медицинская помощь'
+    'Safety Basics', 'Traffic Rules', 'Practical Driving', 'Vehicle Maintenance',
+    'Road Signs', 'Emergency Procedures', 'Night Driving', 'Highway Driving',
+    'Parking Techniques', 'Defensive Driving', 'City Driving',
+    'Weather Conditions', 'First Aid', 'Driving Law', 'Exam Preparation',
+    'Simulator Training', 'Manual Transmission', 'Automatic Transmission',
+    'Inspection Procedure', 'Customer Service'
 ]
 
 LESSON_NAMES = [
-    'Лекция: Основы', 'Семинар: Углублённое изучение', 'Практика: Отработка навыков',
-    'Лабораторная: Эксперимент', 'Консультация', 'Зачёт', 'Экзамен',
-    'Практическое занятие', 'Вождение: Город', 'Вождение: Автодром',
-    'Вождение: Трасса', 'Теоретический курс', 'Мастер-класс', 'Деловая игра'
+    'Classroom Session', 'Route Practice', 'Safety Briefing', 'Driving Lesson',
+    'Mock Exam', 'Feedback Session', 'Vehicle Inspection', 'Simulator Practice',
+    'Road Test', 'Highway Training', 'Parking Practice', 'Night Session',
+    'City Route', 'Emergency Stop', 'Manual Gear Practice'
 ]
 
-MEDICAL_CERTS = ['Справка 086/у', 'Справка 003-В/у', 'Действующая', 'Истекла', 'Отсутствует']
-PASSPORT_PREFIXES = ['4500', '4501', '4502', '4503', '4504', '4505', '4506', '4507', '4508', '4509']
+MEDICAL_CERTS = ['Valid Medical', 'Expired Medical', 'Pending Review', 'Not Required', 'Updated']
+PASSPORT_PREFIXES = ['AA', 'BB', 'CC', 'DD', 'EE', 'FF', 'GG', 'HH', 'JJ', 'KK']
 
 EMAIL_DOMAINS = ['@mail.ru', '@gmail.com', '@yandex.ru', '@inbox.ru', '@bk.ru']
 
@@ -89,23 +83,20 @@ def generate_time():
     return time(hour, minute)
 
 
-def generate_employees(count=50):
+def generate_employees(count=40):
     """Generate employee records"""
     positions = list(range(1, 11))  # position_ids
     employees = []
     
     for i in range(1, count + 1):
-        if i <= 20:
-            name = FIRST_NAMES_MALE[i-1] if i % 3 != 0 else FIRST_NAMES_FEMALE[i-1]
+        if i <= len(FIRST_NAMES_MALE) and i % 3 != 0:
+            name = f"{LAST_NAMES[i % len(LAST_NAMES)]} {FIRST_NAMES_MALE[i-1]}"
+        elif i <= len(FIRST_NAMES_FEMALE):
+            name = f"{LAST_NAMES[i % len(LAST_NAMES)]} {FIRST_NAMES_FEMALE[i-1]}"
         else:
+            first = random.choice(FIRST_NAMES_MALE + FIRST_NAMES_FEMALE)
             last_name = random.choice(LAST_NAMES)
-            gender = random.choice(['male', 'female'])
-            if gender == 'male':
-                first = random.choice(['Алексей', 'Дмитрий', 'Сергей', 'Андрей', 'Николай', 'Павел', 'Максим', 'Юрий', 'Артём', 'Владимир'])
-                name = f"{last_name} {first}"
-            else:
-                first = random.choice(['Мария', 'Анна', 'Елена', 'Ольга', 'Татьяна', 'Наталья', 'Ирина', 'Светлана', 'Юлия', 'Екатерина'])
-                name = f"{last_name}а {first}"
+            name = f"{last_name} {first}"
         
         experience = random.randint(1, 30)
         email = generate_email(name)
@@ -117,20 +108,14 @@ def generate_employees(count=50):
     return employees
 
 
-def generate_students(count=200):
+def generate_students(count=40):
     """Generate student records"""
     students = []
     
     for i in range(1, count + 1):
+        first = random.choice(FIRST_NAMES_MALE + FIRST_NAMES_FEMALE)
         last_name = random.choice(LAST_NAMES)
-        gender = random.choice(['male', 'female'])
-        if gender == 'male':
-            first = random.choice(['Алексей', 'Дмитрий', 'Сергей', 'Андрей', 'Николай', 'Павел', 'Максим', 'Юрий', 'Артём', 'Владимир', 'Роман', 'Игорь', 'Тимур', 'Илья', 'Фёдор'])
-            full_name = f"{last_name} {first}"
-        else:
-            first = random.choice(['Мария', 'Анна', 'Елена', 'Ольга', 'Татьяна', 'Наталья', 'Ирина', 'Светлана', 'Юлия', 'Екатерина', 'Алина', 'Ксения', 'Полина', 'Вера', 'Диана'])
-            full_name = f"{last_name}а {first}"
-        
+        full_name = f"{last_name} {first}"
         passport = generate_passport()
         med_cert = random.choice(MEDICAL_CERTS)
         age = random.randint(16, 35)
@@ -147,7 +132,7 @@ def generate_lessons(count=300, employee_ids=None):
     employee_ids = employee_ids or list(range(1, 51))
     
     for i in range(1, count + 1):
-        result = random.choice(['Зачтено', 'Не зачтено', 'Выполнено', 'В процессе', None, None])
+        result = random.choice(['Passed', 'Failed', 'Completed', 'In progress', None, None])
         topic = random.choice(TOPICS)
         lesson_time = generate_time()
         lesson_date = generate_date()
@@ -190,17 +175,20 @@ def generate_group_lessons(group_ids, lesson_ids, avg_lessons_per_group=15):
     return list(associations)
 
 
-def generate_sql_inserts(output_file='database/populate_main_tables.sql'):
+def generate_sql_inserts(output_file=None):
     """Generate SQL INSERT statements for all main tables"""
+    
+    if output_file is None:
+        output_file = os.path.join(os.path.dirname(__file__), 'populate_main_tables.sql')
     
     random.seed(42)  # Reproducible results
     
-    employees = generate_employees(50)
-    students = generate_students(200)
-    lessons = generate_lessons(300, employee_ids=list(range(1, 51)))
+    employees = generate_employees(40)
+    students = generate_students(40)
+    lessons = generate_lessons(40, employee_ids=list(range(1, 41)))
     
-    student_ids = list(range(1, 201))
-    lesson_ids = list(range(1, 301))
+    student_ids = list(range(1, 41))
+    lesson_ids = list(range(1, 41))
     group_ids = list(range(1, 11))
     
     student_lessons = generate_student_lessons(student_ids, lesson_ids)

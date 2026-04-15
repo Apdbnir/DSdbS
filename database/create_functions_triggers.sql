@@ -11,15 +11,15 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Function: Validate cadet age (must be >= 16)
-CREATE OR REPLACE FUNCTION public.validate_cadet_age()
+-- Function: Validate student age (must be >= 16)
+CREATE OR REPLACE FUNCTION public.validate_student_age()
 RETURNS TRIGGER AS $$
 BEGIN
     IF NEW.age < 16 THEN
-        RAISE EXCEPTION 'Cadet age must be at least 16, got %', NEW.age;
+        RAISE EXCEPTION 'Student age must be at least 16, got %', NEW.age;
     END IF;
     IF NEW.age > 100 THEN
-        RAISE EXCEPTION 'Cadet age seems invalid (>%): %', 100, NEW.age;
+        RAISE EXCEPTION 'Student age seems invalid (>%): %', 100, NEW.age;
     END IF;
     RETURN NEW;
 END;
@@ -39,14 +39,14 @@ BEGIN
     IF NEW.location_id IS NOT NULL THEN
         SELECT location_type INTO loc_type FROM public.locations WHERE id = NEW.location_id;
         
-        -- Validate: "Дистанционно" should use "Онлайн-платформа"
-        IF format_name = 'Дистанционно' AND loc_type != 'Онлайн-платформа' THEN
-            RAISE WARNING 'Format "Дистанционно" typically uses "Онлайн-платформа" location type';
+        -- Validate: "Online" should use "Online Platform"
+        IF format_name = 'Online' AND loc_type != 'Online Platform' THEN
+            RAISE WARNING 'Format "Online" typically uses "Online Platform" location type';
         END IF;
         
-        -- Validate: "Очно" should not use "Онлайн-платформа"
-        IF format_name = 'Очно' AND loc_type = 'Онлайн-платформа' THEN
-            RAISE WARNING 'Format "Очно" should not use "Онлайн-платформа" location type';
+        -- Validate: "Classroom" should not use "Online Platform"
+        IF format_name = 'Classroom' AND loc_type = 'Online Platform' THEN
+            RAISE WARNING 'Format "Classroom" should not use "Online Platform" location type';
         END IF;
     END IF;
     
@@ -54,17 +54,17 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Function: Count cadets in a lesson
-CREATE OR REPLACE FUNCTION public.count_cadets_in_lesson(lesson_id_param BIGINT)
+-- Function: Count students in a lesson
+CREATE OR REPLACE FUNCTION public.count_students_in_lesson(lesson_id_param BIGINT)
 RETURNS INTEGER AS $$
 DECLARE
-    cadet_count INTEGER;
+    student_count INTEGER;
 BEGIN
-    SELECT COUNT(*) INTO cadet_count
-    FROM public.cadet_lessons
+    SELECT COUNT(*) INTO student_count
+    FROM public.student_lessons
     WHERE lesson_id = lesson_id_param;
     
-    RETURN cadet_count;
+    RETURN student_count;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -100,10 +100,10 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Function: Get cadets by group
-CREATE OR REPLACE FUNCTION public.get_cadets_by_group(group_id_param BIGINT)
+-- Function: Get students by group
+CREATE OR REPLACE FUNCTION public.get_students_by_group(group_id_param BIGINT)
 RETURNS TABLE(
-    cadet_id BIGINT,
+    student_id BIGINT,
     full_name VARCHAR,
     passport_number VARCHAR,
     age INTEGER,
@@ -112,15 +112,15 @@ RETURNS TABLE(
 BEGIN
     RETURN QUERY
     SELECT 
-        c.id,
-        c.full_name,
-        c.passport_number,
-        c.age,
+        s.id,
+        s.full_name,
+        s.passport_number,
+        s.age,
         g.group_number
-    FROM public.cadets c
-    LEFT JOIN public.groups g ON c.group_id = g.id
-    WHERE c.group_id = group_id_param
-    ORDER BY c.full_name;
+    FROM public.students s
+    LEFT JOIN public.groups g ON s.group_id = g.id
+    WHERE s.group_id = group_id_param
+    ORDER BY s.full_name;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -149,12 +149,13 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Trigger: Validate cadet age before insert/update
-DROP TRIGGER IF EXISTS trg_validate_cadet_age ON public.cadets;
-CREATE TRIGGER trg_validate_cadet_age
-    BEFORE INSERT OR UPDATE ON public.cadets
+-- Trigger: Validate student age before insert/update
+DROP TRIGGER IF EXISTS trg_validate_student_age ON public.students;
+DROP TRIGGER IF EXISTS trg_validate_cadet_age ON public.students;
+CREATE TRIGGER trg_validate_student_age
+    BEFORE INSERT OR UPDATE ON public.students
     FOR EACH ROW
-    EXECUTE FUNCTION public.validate_cadet_age();
+    EXECUTE FUNCTION public.validate_student_age();
 
 -- Trigger: Validate lesson format/location compatibility
 DROP TRIGGER IF EXISTS trg_validate_format_location ON public.lessons;
@@ -167,8 +168,8 @@ CREATE TRIGGER trg_validate_format_location
 -- Custom operators (example: ILIKE for case-insensitive search)
 -- ============================================================================
 
--- Create a helper function for searching cadets by name (case-insensitive)
-CREATE OR REPLACE FUNCTION public.search_cadets(search_term VARCHAR)
+-- Create a helper function for searching students by name (case-insensitive)
+CREATE OR REPLACE FUNCTION public.search_students(search_term VARCHAR)
 RETURNS TABLE(
     id BIGINT,
     full_name VARCHAR,
@@ -178,15 +179,15 @@ RETURNS TABLE(
 BEGIN
     RETURN QUERY
     SELECT 
-        c.id,
-        c.full_name,
-        c.passport_number,
+        s.id,
+        s.full_name,
+        s.passport_number,
         g.group_number
-    FROM public.cadets c
-    LEFT JOIN public.groups g ON c.group_id = g.id
-    WHERE c.full_name ILIKE '%' || search_term || '%'
-       OR c.passport_number ILIKE '%' || search_term || '%'
-    ORDER BY c.full_name;
+    FROM public.students s
+    LEFT JOIN public.groups g ON s.group_id = g.id
+    WHERE s.full_name ILIKE '%' || search_term || '%'
+       OR s.passport_number ILIKE '%' || search_term || '%'
+    ORDER BY s.full_name;
 END;
 $$ LANGUAGE plpgsql;
 

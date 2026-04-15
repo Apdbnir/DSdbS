@@ -22,12 +22,25 @@ echo Installing dependencies...
 pip install --upgrade -r requirements.txt
 
 echo.
-echo Launching server and application in separate windows...
-
-start "Driving School Server" cmd /k "cd /d "%~dp0backend" && call venv\Scripts\activate && python server.py"
-start "Driving School App" cmd /k "cd /d "%~dp0backend" && call venv\Scripts\activate && python app.py"
+echo Checking database...
+python db_check.py
+if %ERRORLEVEL% neq 0 (
+    echo Database not found. Running database setup...
+    call ..\database\setup_database.bat
+    if %ERRORLEVEL% neq 0 (
+        echo Database setup failed. Please fix PostgreSQL installation or run database\setup_database.bat manually.
+        exit /b 1
+    )
+)
 
 echo.
-echo Server and application have been started.
-echo Close these windows to stop each component.
-pause
+echo Launching server and application without opening new windows...
+echo.
+
+start "" /b /d "%~dp0backend" cmd /c "call venv\Scripts\activate && python server.py > server.log 2>&1"
+start "" /b /d "%~dp0backend" cmd /c "call venv\Scripts\activate && pythonw.exe app.py > app.log 2>&1"
+
+echo.
+echo Server and application have been started in the background.
+echo Logs: %~dp0backend\server.log, %~dp0backend\app.log
+exit /b

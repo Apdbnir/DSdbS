@@ -1,79 +1,78 @@
 -- ============================================================================
--- Seed Data: Lookup Tables (Справочники)
+-- Seed Data: Lookup Tables
 -- These tables can only be modified by superuser
 -- ============================================================================
 
--- Positions (Должности)
+-- Positions
 INSERT INTO public.positions (id, name, phone, employment_type, notes) VALUES
-(1, 'Преподаватель', '+7(900)111-11-11', 'Полная занятость', 'Основной преподавательский состав'),
-(2, 'Старший преподаватель', '+7(900)222-22-22', 'Полная занятость', 'Ведущие преподаватели'),
-(3, 'Доцент', '+7(900)333-33-33', 'Полная занятость', 'Научно-преподавательский состав'),
-(4, 'Профессор', '+7(900)444-44-44', 'Полная занятость', 'Профессорско-преподавательский состав'),
-(5, 'Лаборант', '+7(900)555-55-55', 'Частичная занятость', 'Вспомогательный персонал'),
-(6, 'Методист', '+7(900)666-66-66', 'Полная занятость', 'Учебно-методический отдел'),
-(7, 'Заведующий кафедрой', '+7(900)777-77-77', 'Полная занятость', 'Руководство кафедры'),
-(8, 'Декан', '+7(900)888-88-88', 'Полная занятость', 'Руководство факультета'),
-(9, 'Инструктор по вождению', '+7(900)999-99-99', 'Полная занятость', 'Практическое обучение вождению'),
-(10, 'Администратор', '+7(900)101-01-01', 'Полная занятость', 'Административный персонал')
+(1, 'Instructor', '+1-202-555-0101', 'Full-time', 'Lead driving instructor'),
+(2, 'Senior Instructor', '+1-202-555-0102', 'Full-time', 'Office and training lead'),
+(3, 'Assistant Instructor', '+1-202-555-0103', 'Part-time', 'Support instructor'),
+(4, 'Administrator', '+1-202-555-0104', 'Full-time', 'Office administrator'),
+(5, 'Coordinator', '+1-202-555-0105', 'Full-time', 'Schedule coordinator'),
+(6, 'Mechanic', '+1-202-555-0106', 'Part-time', 'Vehicle maintenance'),
+(7, 'Dispatcher', '+1-202-555-0107', 'Full-time', 'Routes and logistics'),
+(8, 'Customer Service', '+1-202-555-0108', 'Full-time', 'Student support'),
+(9, 'Training Manager', '+1-202-555-0109', 'Full-time', 'Program manager'),
+(10, 'Office Assistant', '+1-202-555-0110', 'Part-time', 'Administrative assistant')
 ON CONFLICT (id) DO NOTHING;
 
--- Reset sequence
 SELECT setval('public.positions_id_seq', (SELECT MAX(id) FROM public.positions));
 
--- Lesson Formats (Форма реализации)
+-- Lesson Formats
 INSERT INTO public.lesson_formats (id, name) VALUES
-(1, 'Очно'),
-(2, 'Дистанционно'),
-(3, 'Выездной'),
-(4, 'Смешанно')
+(1, 'Classroom'),
+(2, 'Online'),
+(3, 'On-road'),
+(4, 'Mixed')
 ON CONFLICT (id) DO NOTHING;
 
 SELECT setval('public.lesson_formats_id_seq', (SELECT MAX(id) FROM public.lesson_formats));
 
--- Locations (Место проведения)
+-- Locations
 INSERT INTO public.locations (id, geolocation, location_type, address, responsible_employee_id) VALUES
-(1, '55.7558, 37.6173', 'Аудитория', 'г. Москва, ул. Учебная, д. 1, ауд. 101', 1),
-(2, '55.7560, 37.6180', 'Аудитория', 'г. Москва, ул. Учебная, д. 1, ауд. 102', 2),
-(3, '55.7562, 37.6190', 'Аудитория', 'г. Москва, ул. Учебная, д. 1, ауд. 201', 3),
-(4, '55.7565, 37.6200', 'Компьютерный класс', 'г. Москва, ул. Учебная, д. 2, комн. 301', 5),
-(5, '55.7570, 37.6210', 'Лаборатория', 'г. Москва, ул. Научная, д. 3, лаб. 1', 4),
-(6, '55.7580, 37.6220', 'Лекционный зал', 'г. Москва, ул. Учебная, д. 1, зал 1', 7),
-(7, '55.7590, 37.6230', 'Автодром', 'г. Москва, ул. Практическая, д. 10', 9),
-(8, '55.7600, 37.6240', 'Онлайн-платформа', 'Дистанционное обучение (Zoom/Moodle)', 6),
-(9, '55.7610, 37.6250', 'Учебный полигон', 'г. Москва, ул. Полигонная, д. 5', 9),
-(10, '55.7620, 37.6260', 'Библиотека', 'г. Москва, ул. Учебная, д. 3, библ. 1', 5)
+(1, '38.8977,-77.0365', 'Classroom', '123 School St, Washington, DC', 1),
+(2, '34.0522,-118.2437', 'Classroom', '456 Training Ave, Los Angeles, CA', 2),
+(3, '41.8781,-87.6298', 'Classroom', '789 Practice Blvd, Chicago, IL', 3),
+(4, '29.7604,-95.3698', 'Computer Lab', '101 Digital Rd, Houston, TX', 4),
+(5, '40.7128,-74.0060', 'Workshop', '202 Service Ln, New York, NY', 5),
+(6, '47.6062,-122.3321', 'Auditorium', '303 Lecture Way, Seattle, WA', 6),
+(7, '39.9526,-75.1652', 'Driving Range', '404 Practice Dr, Philadelphia, PA', 7),
+(8, '37.7749,-122.4194', 'Online Platform', 'Virtual Classroom (Zoom/Webex)', 8),
+(9, '33.4484,-112.0740', 'Outdoor Track', '505 Track Rd, Phoenix, AZ', 1),
+(10, '32.7767,-96.7970', 'Classroom', '606 Study Cir, Dallas, TX', 2)
 ON CONFLICT (id) DO NOTHING;
 
 SELECT setval('public.locations_id_seq', (SELECT MAX(id) FROM public.locations));
 
--- Vehicles (Автомобили)
+-- Vehicles
 INSERT INTO public.vehicles (id, vehicle_number, route, notes, category) VALUES
-(1, 'А001АА77', 'Маршрут №1: Автодром - Город', 'Исправен, ТО пройдено', 'B'),
-(2, 'А002АА77', 'Маршрут №2: Автодром - Трасса', 'Исправен', 'B'),
-(3, 'А003АА77', 'Маршрут №3: Город - Трасса', 'Требуется замена масла', 'B'),
-(4, 'В001ВВ77', 'Маршрут №4: База - Объект №1', 'Исправен', 'C'),
-(5, 'В002ВВ77', 'Маршрут №5: База - Объект №2', 'На обслуживании', 'C'),
-(6, 'С001СС77', 'Маршрут №6: Учебный маршрут', 'Исправен', 'B'),
-(7, 'С002СС77', 'Маршрут №7: Комбинированный', 'Исправен', 'B,C'),
-(8, 'Е001ЕЕ77', 'Маршрут №8: Городской', 'Новый автомобиль', 'B'),
-(9, 'К001КК77', 'Маршрут №9: Межгород', 'Исправен', 'C'),
-(10, 'М001ММ77', 'Маршрут №10: Специальный', 'Спецоборудование установлено', 'B')
+(1, 'D001', 'Downtown loop', 'Clean and serviced', 'B'),
+(2, 'D002', 'Highway route', 'New tires installed', 'B'),
+(3, 'D003', 'Suburban route', 'Needs oil change soon', 'B'),
+(4, 'D004', 'Practice circuit', 'Ready for lessons', 'C'),
+(5, 'D005', 'City route', 'Brake inspection complete', 'B'),
+(6, 'D006', 'Night training', 'Equipped with safety kit', 'B'),
+(7, 'D007', 'Combined route', 'Fuel-efficient model', 'B,C'),
+(8, 'D008', 'Main highway', 'Air conditioning works', 'B'),
+(9, 'D009', 'Intercity route', 'Recent maintenance', 'C'),
+(10, 'D010', 'Safety route', 'Fully insured', 'B')
 ON CONFLICT (id) DO NOTHING;
 
 SELECT setval('public.vehicles_id_seq', (SELECT MAX(id) FROM public.vehicles));
 
--- Groups (Группы)
+-- Groups
 INSERT INTO public.groups (id, group_number, room_number, format_type) VALUES
-(1, 'ГР-101', '101', 'Очно'),
-(2, 'ГР-102', '102', 'Очно'),
-(3, 'ГР-201', '201', 'Смешанно'),
-(4, 'ГР-202', '202', 'Очно'),
-(5, 'ГР-301', '301', 'Дистанционно'),
-(6, 'ГР-302', '302', 'Очно'),
-(7, 'ГР-401', '101', 'Выездной'),
-(8, 'ГР-402', '102', 'Смешанно'),
-(9, 'ГР-501', '201', 'Очно'),
-(10, 'ГР-502', '202', 'Дистанционно')
+(1, 'GR-101', '101', 'Classroom'),
+(2, 'GR-102', '102', 'Classroom'),
+(3, 'GR-201', '201', 'Mixed'),
+(4, 'GR-202', '202', 'Classroom'),
+(5, 'GR-301', '301', 'Online'),
+(6, 'GR-302', '302', 'Classroom'),
+(7, 'GR-401', '401', 'On-road'),
+(8, 'GR-402', '402', 'Mixed'),
+(9, 'GR-501', '501', 'Classroom'),
+(10, 'GR-502', '502', 'Online')
 ON CONFLICT (id) DO NOTHING;
 
 SELECT setval('public.groups_id_seq', (SELECT MAX(id) FROM public.groups));

@@ -12,21 +12,35 @@ echo ===========================================================================
 echo.
 
 REM Set PostgreSQL bin path (adjust if needed)
-set PG_BIN=C:\Program Files\PostgreSQL\16\bin
+set PG_BIN=
 set PG_HOST=localhost
 set PG_PORT=5432
 set PG_USER=postgres
 set PG_PASSWORD=postgres
 set DB_NAME=driving_school
 
-REM Check if psql exists
+REM Auto-detect psql if available in PATH or common install locations
+for /f "delims=" %%P in ('where psql 2^>nul') do (
+    set PG_BIN=%%~dpP
+    goto :found_psql
+)
+for %%V in (17 16 15 14 13) do (
+    if exist "C:\Program Files\PostgreSQL\%%V\bin\psql.exe" (
+        set PG_BIN=C:\Program Files\PostgreSQL\%%V\bin
+        goto :found_psql
+    )
+)
+for %%V in (17 16 15 14 13) do (
+    if exist "C:\Program Files (x86)\PostgreSQL\%%V\bin\psql.exe" (
+        set PG_BIN=C:\Program Files (x86)\PostgreSQL\%%V\bin
+        goto :found_psql
+    )
+)
+
+:found_psql
 if not exist "%PG_BIN%\psql.exe" (
-    echo ERROR: psql.exe not found at %PG_BIN%
-    echo Please update the PG_BIN path in this script to point to your PostgreSQL installation.
-    echo Common paths:
-    echo   C:\Program Files\PostgreSQL\16\bin
-    echo   C:\Program Files\PostgreSQL\15\bin
-    echo   C:\Program Files\PostgreSQL\14\bin
+    echo ERROR: psql.exe not found. Please install PostgreSQL and make sure psql.exe is on PATH.
+    echo If PostgreSQL is installed, update PG_BIN in database\setup_database.bat or add it to PATH.
     pause
     exit /b 1
 )
@@ -34,14 +48,24 @@ if not exist "%PG_BIN%\psql.exe" (
 REM Set password for psql
 set PGPASSWORD=%PG_PASSWORD%
 
-echo [1/5] Creating database...
-"%PG_BIN%\psql.exe" -U %PG_USER% -h %PG_HOST% -p %PG_PORT% -c "SELECT 'CREATE DATABASE %DB_NAME%' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '%DB_NAME%')\gexec"
-if %errorlevel% neq 0 (
-    echo ERROR: Failed to create database
-    pause
-    exit /b 1
+echo [1/5] Creating database if needed...
+setlocal enabledelayedexpansion
+for /f "usebackq delims=" %%D in (`"%PG_BIN%\psql.exe" -U %PG_USER% -h %PG_HOST% -p %PG_PORT% -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = '%DB_NAME%'"`) do (
+    set DB_EXISTS=%%D
 )
-echo Database created successfully.
+if "%DB_EXISTS%"=="1" (
+    echo Database %DB_NAME% already exists.
+) else (
+    "%PG_BIN%\psql.exe" -U %PG_USER% -h %PG_HOST% -p %PG_PORT% -d postgres -c "CREATE DATABASE %DB_NAME%"
+    if %errorlevel% neq 0 (
+        echo ERROR: Failed to create database
+        pause
+        endlocal
+        exit /b 1
+    )
+    echo Database %DB_NAME% created successfully.
+)
+endlocal
 
 echo.
 echo [2/5] Creating schema (tables, constraints, indexes, views)...
@@ -65,8 +89,13 @@ echo Lookup tables seeded successfully.
 
 echo.
 echo [4/5] Generating and populating main tables data...
-echo Running data generator...
-python "%~dp0data_generator.py"
+if exist "%~dp0..\backend\venv\Scripts\python.exe" (
+    set "PYTHON=%~dp0..\backend\venv\Scripts\python.exe"
+) else (
+    set "PYTHON=python"
+)
+echo Running data generator using %PYTHON% ...
+%PYTHON% "%~dp0data_generator.py"
 if %errorlevel% neq 0 (
     echo ERROR: Failed to run data generator
     pause
@@ -108,19 +137,19 @@ echo   - lesson_formats (4 records)
 echo   - locations (10 records)
 echo   - vehicles (10 records)
 echo   - groups (10 records)
-echo   - employees (50 records)
-echo   - cadets (200 records)
-echo   - lessons (300 records)
-echo   - cadet_lessons (900+ associations)
-echo   - group_lessons (170+ associations)
+echo   - employees (40 records)
+echo   - students (40 records)
+echo   - lessons (40 records)
+echo   - student_lessons (120+ associations)
+echo   - group_lessons (80+ associations)
 echo.
 echo Views:
 echo   - v_lessons_full
-echo   - v_cadets_full
+echo   - v_students_full
 echo   - v_employees_full
 echo.
 echo Triggers:
-echo   - trg_validate_cadet_age
+echo   - trg_validate_student_age
 echo   - trg_validate_format_location
 echo.
 echo To verify, run: "%PG_BIN%\psql.exe" -U %PG_USER% -d %DB_NAME% -c "SELECT * FROM public.v_lessons_full LIMIT 5;"

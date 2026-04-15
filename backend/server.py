@@ -11,9 +11,13 @@ import os
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 from datetime import datetime
-import psycopg2
-import psycopg2.extras
-from psycopg2.extras import RealDictCursor
+try:
+    import pg8000
+except ImportError as e:
+    raise ImportError(
+        "pg8000 is not installed for the active Python interpreter. "
+        "Activate backend\\venv or use backend\\venv\\Scripts\\python.exe to run server.py."
+    ) from e
 from logging_config import setup_logging
 
 # Load configuration
@@ -103,52 +107,48 @@ class DatabaseManager:
         user = str(self.db_config['user'])
         password = str(self.db_config['password'])
 
-        connect_kwargs = {
-            'host': host,
-            'port': port,
-            'dbname': dbname,
-            'user': user,
-            'password': password
-        }
-        masked_dsn = f"host={host} port={port} dbname={dbname} user={user} password=***"
-        logger.debug('Connecting to PostgreSQL DSN=%r', masked_dsn)
+        port = int(self.db_config['port'])
+        dbname = str(self.db_config['name'])
+        user = str(self.db_config['user'])
+        password = str(self.db_config['password'])
+
+        logger.debug('Connecting to PostgreSQL host=%r port=%r dbname=%r user=%r', host, port, dbname, user)
         try:
-            conn = psycopg2.connect(**connect_kwargs)
-            conn.set_client_encoding('UTF8')
-            return conn
-        except UnicodeDecodeError as e:
-            logger.warning('UnicodeDecodeError while connecting, retrying with LATIN1: %s', e)
-            try:
-                conn = psycopg2.connect(options='-c client_encoding=LATIN1', **connect_kwargs)
-                conn.set_client_encoding('LATIN1')
-                return conn
-            except Exception as inner_e:
-                logger.warning('Retry with LATIN1 failed: %s', inner_e)
-                conn = psycopg2.connect(options='-c client_encoding=WIN1251', **connect_kwargs)
-                conn.set_client_encoding('WIN1251')
-                return conn
+            return pg8000.connect(
+                host=host,
+                port=port,
+                database=dbname,
+                user=user,
+                password=password
+            )
+        except pg8000.dbapi.ProgrammingError as e:
+            err = e.args[0] if e.args else None
+            if isinstance(err, dict) and err.get('C') == '3D000':
+                raise RuntimeError(
+                    f"Database '{dbname}' does not exist. Run start.bat or database\\setup_database.bat to create it."
+                ) from e
+            raise
     
     def execute_query(self, query, params=None, fetch=True):
         """Execute a database query"""
         conn = None
         try:
             conn = self.get_connection()
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
-            cursor.execute(query, params)
+            cursor = conn.cursor()
+            cursor.execute(query, params or ())
             
             if fetch:
-                result = cursor.fetchall()
-                # Convert datetime and other non-serializable types
-                result = [self._serialize_row(row) for row in result]
+                columns = [desc[0] for desc in cursor.description] if cursor.description else []
+                rows = cursor.fetchall()
+                result = [self._serialize_row(dict(zip(columns, row))) for row in rows]
                 cursor.close()
                 conn.close()
                 return result
             else:
                 conn.commit()
-                last_id = cursor.lastrowid if hasattr(cursor, 'lastrowid') else None
                 cursor.close()
                 conn.close()
-                return last_id
+                return None
         except Exception as e:
             if conn:
                 conn.rollback()
